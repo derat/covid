@@ -29,9 +29,11 @@ func main() {
 		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %v [flags] <YYYYMMDD.csv> ...\n", os.Args[0])
 		flag.PrintDefaults()
 	}
-	state := flag.String("state", "California", `State (as it appears in CSV files)`)
+	state := flag.String("state", "California", `State (as it appears in CSV files), empty for all`)
 	start := flag.String("start", now.AddDate(0, -3, 0).Format(dateLayout), `Starting week-end date`)
 	end := flag.String("end", now.Format(dateLayout), `Endiing week-end date`)
+	covid := flag.Bool("covid", false, "Show only deaths attributed to COVID-19")
+	predicted := flag.Bool("predicted", false, "Show predicted deaths instead of actual")
 	flag.Parse()
 
 	startDate, err := time.Parse(dateLayout, *start)
@@ -44,7 +46,7 @@ func main() {
 	}
 
 	// Read the CSV files.
-	ds := newDataSet(*state, startDate, endDate)
+	ds := newDataSet(*state, startDate, endDate, *covid, *predicted)
 	for _, p := range flag.Args() {
 		if err := ds.readFile(p); err != nil {
 			log.Fatalf("Failed reading %v: %v", p, err)
@@ -94,10 +96,28 @@ func writeGnuplot(ds *dataSet, dataPath string) (string, error) {
 		return "", err
 	}
 
+	title := "CDC Weekly "
+	if ds.predicted {
+		title += "Predicted "
+	} else {
+		title += "Observed "
+	}
+	if ds.covid {
+		title += "COVID-19 "
+	} else {
+		title += "All-Cause "
+	}
+	title += "Mortality for "
+	if ds.state != "" {
+		title += ds.state
+	} else {
+		title += "All States"
+	}
+
 	if err := template.Must(template.New("").Funcs(map[string]interface{}{
 		"indexCol": func(i int) int { return i + 2 },
 	}).Parse(`
-set title 'CDC Weekly Mortality for {{.State}}'
+set title '{{.Title}}'
 
 set xlabel 'Reporting Date'
 set xdata time
@@ -108,13 +128,32 @@ set yrange [0:*]
 
 set key autotitle columnheader bottom right title 'Week End'
 
+# https://stackoverflow.com/a/57239036
+set linetype  1 lc rgb "dark-violet" lw 1 dt 1 pt 0
+set linetype  2 lc rgb "#009e73"     lw 1 dt 1 pt 7
+set linetype  3 lc rgb "#56b4e9"     lw 1 dt 1 pt 6 pi -1
+set linetype  4 lc rgb "#e69f00"     lw 1 dt 1 pt 5 pi -1
+set linetype  5 lc rgb "#f0e442"     lw 1 dt 1 pt 8
+set linetype  6 lc rgb "#0072b2"     lw 1 dt 1 pt 3
+set linetype  7 lc rgb "#e51e10"     lw 1 dt 1 pt 11
+set linetype  8 lc rgb "black"       lw 1 dt 1
+set linetype  9 lc rgb "dark-violet" lw 1 dt 3 pt 0
+set linetype 10 lc rgb "#009e73"     lw 1 dt 3 pt 7
+set linetype 11 lc rgb "#56b4e9"     lw 1 dt 3 pt 6 pi -1
+set linetype 12 lc rgb "#e69f00"     lw 1 dt 3 pt 5 pi -1
+set linetype 13 lc rgb "#f0e442"     lw 1 dt 3 pt 8
+set linetype 14 lc rgb "#0072b2"     lw 1 dt 3 pt 3
+set linetype 15 lc rgb "#e51e10"     lw 1 dt 3 pt 11
+set linetype 16 lc rgb "black"       lw 1 dt 3
+set linetype cycle 16
+
 num_lines = {{.NumLines}}
 plot for [i=2:num_lines+2] '{{.DataPath}}' using 1:i with lines
 `)).Execute(f, struct {
-		State    string
+		Title    string
 		DataPath string
 		NumLines int
-	}{ds.state, dataPath, len(ds.weekSeries)}); err != nil {
+	}{title, dataPath, len(ds.weekSeries)}); err != nil {
 		f.Close()
 		return "", err
 	}
@@ -128,19 +167,23 @@ type timeseries map[string]int
 // It parses CSV files downloaded on different days and tracks how each week's
 // reported mortality has changed over time.
 type dataSet struct {
-	state      string                // state name, e.g. "California"
-	start, end time.Time             // start and end dates
+	state      string    // state name, e.g. "California"
+	start, end time.Time // start and end dates
+	covid      bool
+	predicted  bool
 	fileDates  map[string]struct{}   // dates of parsed data as e.g. "20200425"
 	weekSeries map[string]timeseries // keyed by week end as e.g. "20200425"
 }
 
 // newDataSet returns a new dataSet that saves mortality data for week-end
 // dates between start and end for the supplied state.
-func newDataSet(state string, start, end time.Time) *dataSet {
+func newDataSet(state string, start, end time.Time, covid, predicted bool) *dataSet {
 	return &dataSet{
 		state:      state,
 		start:      start,
 		end:        end,
+		covid:      covid,
+		predicted:  predicted,
 		fileDates:  make(map[string]struct{}),
 		weekSeries: make(map[string]timeseries),
 	}
@@ -193,6 +236,9 @@ func (ds *dataSet) readFile(p string) error {
 		}
 	}
 
+	// Week-end dates for which we saw excluding-COVID numbers.
+	gotExclCovid := make(map[string]struct{})
+
 	for {
 		vals, err := r.Read()
 		if err == io.EOF {
@@ -201,9 +247,12 @@ func (ds *dataSet) readFile(p string) error {
 			return err
 		}
 
-		if vals[stateCol] != ds.state ||
-			vals[typeCol] != "Unweighted" || // vs. "Predicted (weighted)"
-			vals[outcomeCol] != "All causes" { // vs. "All causes, excluding COVID-19"
+		if ds.state != "" && vals[stateCol] != ds.state {
+			continue
+		}
+
+		if (ds.predicted && vals[typeCol] != "Predicted (weighted)") ||
+			(!ds.predicted && vals[typeCol] != "Unweighted") {
 			continue
 		}
 
@@ -234,8 +283,25 @@ func (ds *dataSet) readFile(p string) error {
 			ts = make(timeseries)
 			ds.weekSeries[ws] = ts
 		}
-		ts[fileDate] = observed
+
+		if o := vals[outcomeCol]; o == "All causes" {
+			ts[fileDate] += observed
+		} else if ds.covid && o == "All causes, excluding COVID-19" {
+			ts[fileDate] -= observed
+			gotExclCovid[ws] = struct{}{}
+		}
 	}
+
+	// For recent weeks, actual (as opposed to estimated) excluding-COVID numbers aren't reported.
+	// Clear these data points to avoid incorrectly reporting all-cause deaths here.
+	if ds.covid {
+		for we, ts := range ds.weekSeries {
+			if _, ok := gotExclCovid[we]; !ok {
+				delete(ts, fileDate)
+			}
+		}
+	}
+
 	return nil
 }
 
