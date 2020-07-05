@@ -30,8 +30,8 @@ func main() {
 		flag.PrintDefaults()
 	}
 	state := flag.String("state", "California", `State (as it appears in CSV files), empty for all`)
-	start := flag.String("start", now.AddDate(0, -3, 0).Format(dateLayout), `Starting week-end date`)
-	end := flag.String("end", now.Format(dateLayout), `Endiing week-end date`)
+	start := flag.String("start", now.AddDate(0, -3, 0).Format(dateLayout), `Starting week-ending date`)
+	end := flag.String("end", now.Format(dateLayout), `Ending week-ending date`)
 	covid := flag.Bool("covid", false, "Show only deaths attributed to COVID-19")
 	predicted := flag.Bool("predicted", false, "Show predicted deaths instead of actual")
 	flag.Parse()
@@ -111,7 +111,7 @@ func writeGnuplot(ds *dataSet, dataPath string) (string, error) {
 	if ds.state != "" {
 		title += ds.state
 	} else {
-		title += "All States"
+		title += "United States"
 	}
 
 	if err := template.Must(template.New("").Funcs(map[string]interface{}{
@@ -126,7 +126,7 @@ set timefmt '%Y%m%d'
 set ylabel 'Deaths'
 set yrange [0:*]
 
-set key autotitle columnheader bottom right title 'Week End'
+set key autotitle columnheader bottom right title 'Week Ending'
 
 # https://stackoverflow.com/a/57239036
 set linetype  1 lc rgb "dark-violet" lw 1 dt 1 pt 0
@@ -175,7 +175,7 @@ type dataSet struct {
 	weekSeries map[string]timeseries // keyed by week end as e.g. "20200425"
 }
 
-// newDataSet returns a new dataSet that saves mortality data for week-end
+// newDataSet returns a new dataSet that saves mortality data for week-ending
 // dates between start and end for the supplied state.
 func newDataSet(state string, start, end time.Time, covid, predicted bool) *dataSet {
 	return &dataSet{
@@ -236,7 +236,7 @@ func (ds *dataSet) readFile(p string) error {
 		}
 	}
 
-	// Week-end dates for which we saw excluding-COVID numbers.
+	// Week-ending dates for which we saw excluding-COVID numbers.
 	gotExclCovid := make(map[string]struct{})
 
 	for {
@@ -261,7 +261,7 @@ func (ds *dataSet) readFile(p string) error {
 		weekEnd, err := time.Parse("2006-01-02", s)
 		if err != nil {
 			if weekEnd, err = time.Parse("01/02/2006", s); err != nil {
-				return fmt.Errorf("failed to parse week-end date %q: %v", s, err)
+				return fmt.Errorf("failed to parse week-ending date %q: %v", s, err)
 			}
 		}
 		if weekEnd.Before(ds.start) || weekEnd.After(ds.end) {
