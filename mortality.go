@@ -45,6 +45,10 @@ func main() {
 	if *covid && *excess {
 		log.Fatal("Can't use -covid and -excess simultaneously")
 	}
+
+	if *state == "" {
+		*state = "United States"
+	}
 	startDate, err := time.Parse(dateLayout, *start)
 	if err != nil {
 		log.Fatalf("Bad -start date %q: %v", *start, err)
@@ -265,7 +269,7 @@ func (ds *dataSet) readFile(p string) error {
 			return err
 		}
 
-		if ds.state != "" && vals[stateCol] != ds.state {
+		if vals[stateCol] != ds.state {
 			continue
 		}
 
