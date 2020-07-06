@@ -29,13 +29,22 @@ func main() {
 		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %v [flags] <YYYYMMDD.csv> ...\n", os.Args[0])
 		flag.PrintDefaults()
 	}
-	state := flag.String("state", "California", `State (as it appears in CSV files), empty for all`)
+	state := flag.String("state", "", `State as it appears in CSV files, e.g. "California", or empty for all`)
 	start := flag.String("start", now.AddDate(0, -3, 0).Format(dateLayout), `Starting week-ending date`)
 	end := flag.String("end", now.Format(dateLayout), `Ending week-ending date`)
 	covid := flag.Bool("covid", false, "Show only deaths attributed to COVID-19")
-	predicted := flag.Bool("predicted", false, "Show predicted deaths instead of actual")
+	predicted := flag.Bool("predicted", false, "Use predicted deaths rather than observed")
+	excess := flag.Bool("excess", false, "Show excess (vs. upper-bound threshold) deaths")
 	flag.Parse()
 
+	if len(flag.Args()) == 0 {
+		flag.Usage()
+		os.Exit(2)
+	}
+
+	if *covid && *excess {
+		log.Fatal("Can't use -covid and -excess simultaneously")
+	}
 	startDate, err := time.Parse(dateLayout, *start)
 	if err != nil {
 		log.Fatalf("Bad -start date %q: %v", *start, err)
@@ -46,7 +55,7 @@ func main() {
 	}
 
 	// Read the CSV files.
-	ds := newDataSet(*state, startDate, endDate, *covid, *predicted)
+	ds := newDataSet(*state, startDate, endDate, *covid, *predicted, *excess)
 	for _, p := range flag.Args() {
 		if err := ds.readFile(p); err != nil {
 			log.Fatalf("Failed reading %v: %v", p, err)
@@ -96,37 +105,38 @@ func writeGnuplot(ds *dataSet, dataPath string) (string, error) {
 		return "", err
 	}
 
-	title := "CDC Weekly "
-	if ds.predicted {
-		title += "Predicted "
-	} else {
-		title += "Observed "
+	var titleParts []string
+	addTitlePart := func(cond bool, a, b string) {
+		if cond {
+			titleParts = append(titleParts, a)
+		} else if b != "" {
+			titleParts = append(titleParts, b)
+		}
 	}
-	if ds.covid {
-		title += "COVID-19 "
-	} else {
-		title += "All-Cause "
-	}
-	title += "Mortality for "
-	if ds.state != "" {
-		title += ds.state
-	} else {
-		title += "United States"
-	}
+	addTitlePart(true, "CDC Weekly", "")
+	addTitlePart(ds.predicted, "Predicted", "Observed")
+	addTitlePart(ds.excess, "Excess", "")
+	addTitlePart(ds.covid, "COVID-19", "All-Cause")
+	addTitlePart(true, "Mortality for", "")
+	addTitlePart(ds.state != "", ds.state, "United States")
+	title := strings.Join(titleParts, " ")
 
 	if err := template.Must(template.New("").Funcs(map[string]interface{}{
 		"indexCol": func(i int) int { return i + 2 },
 	}).Parse(`
-set title '{{.Title}}'
+set title "{{.Title}}\n\n" . \
+  "{/*0.8 Source: https://data.cdc.gov/NCHS/Excess-Deaths-Associated-with-COVID-19/xkkf-xrst/\n}" . \
+  "{/*0.8 Shows changes to CDC data over time.}"
 
-set xlabel 'Reporting Date'
+set xlabel 'Data Update Date'
 set xdata time
 set timefmt '%Y%m%d'
 
 set ylabel 'Deaths'
-set yrange [0:*]
+set yrange [*<0:*]
+set grid xtics ytics
 
-set key autotitle columnheader bottom right title 'Week Ending'
+set key autotitle columnheader outside top right title 'Week Ending'
 
 # https://stackoverflow.com/a/57239036
 set linetype  1 lc rgb "dark-violet" lw 1 dt 1 pt 0
@@ -171,19 +181,21 @@ type dataSet struct {
 	start, end time.Time // start and end dates
 	covid      bool
 	predicted  bool
+	excess     bool
 	fileDates  map[string]struct{}   // dates of parsed data as e.g. "20200425"
 	weekSeries map[string]timeseries // keyed by week end as e.g. "20200425"
 }
 
 // newDataSet returns a new dataSet that saves mortality data for week-ending
 // dates between start and end for the supplied state.
-func newDataSet(state string, start, end time.Time, covid, predicted bool) *dataSet {
+func newDataSet(state string, start, end time.Time, covid, predicted, excess bool) *dataSet {
 	return &dataSet{
 		state:      state,
 		start:      start,
 		end:        end,
 		covid:      covid,
 		predicted:  predicted,
+		excess:     excess,
 		fileDates:  make(map[string]struct{}),
 		weekSeries: make(map[string]timeseries),
 	}
@@ -215,24 +227,30 @@ func (ds *dataSet) readFile(p string) error {
 	if err != nil {
 		return fmt.Errorf("failed reading header: %v", err)
 	}
-	var weekEndCol, stateCol, observedCol, typeCol, outcomeCol int
-	for name, dst := range map[string]*int{
-		"Week Ending Date": &weekEndCol,
-		"State":            &stateCol,
-		"Observed Number":  &observedCol,
-		"Type":             &typeCol,
-		"Outcome":          &outcomeCol,
+	var weekEndCol, stateCol, observedCol, thresholdCol, typeCol, outcomeCol int
+	for nameList, dst := range map[string]*int{
+		"Week Ending Date":                &weekEndCol,
+		"State":                           &stateCol,
+		"Observed Number":                 &observedCol,
+		"Upper Bound Threshold,Threshold": &thresholdCol, // column named changed
+		"Type":                            &typeCol,
+		"Outcome":                         &outcomeCol,
 	} {
+		names := strings.Split(nameList, ",")
 		found := false
+	ColumnLoop:
 		for i, s := range cols {
-			if s == name || s == "\ufeff"+name { // Sigh.
-				*dst = i
-				found = true
-				break
+			s = strings.TrimLeft(s, "\ufeff") // sigh
+			for _, name := range names {
+				if s == name {
+					*dst = i
+					found = true
+					break ColumnLoop
+				}
 			}
 		}
 		if !found {
-			return fmt.Errorf("missing column %q", name)
+			return fmt.Errorf("missing column %q", nameList)
 		}
 	}
 
@@ -274,7 +292,19 @@ func (ds *dataSet) readFile(p string) error {
 		}
 		observed, err := strconv.Atoi(s)
 		if err != nil {
-			return fmt.Errorf("failed to parse value %q: %v", s, err)
+			return fmt.Errorf("failed to parse observed value %q: %v", s, err)
+		}
+
+		if ds.excess {
+			s = vals[thresholdCol]
+			if s == "" {
+				continue
+			}
+			threshold, err := strconv.Atoi(s)
+			if err != nil {
+				return fmt.Errorf("failed to parse threshold value %q: %v", s, err)
+			}
+			observed -= threshold
 		}
 
 		ws := weekEnd.Format(dateLayout)
