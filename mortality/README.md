@@ -14,6 +14,7 @@ The CSV data can be downloaded from
 <https://data.cdc.gov/api/views/xkkf-xrst/rows.csv?accessType=DOWNLOAD&bom=true&format=true%20target=>,
 and several historical snapshots are available at
 <http://web.archive.org/web/*/https://data.cdc.gov/api/views/xkkf-xrst/rows.csv?accessType=DOWNLOAD&bom=true&format=true%20target=>.
+The dataset is updated roughly weekly.
 
 The CDC also provides provides [Technical Notes] with more information about the
 data.
