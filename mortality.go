@@ -10,6 +10,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -29,6 +30,7 @@ func main() {
 		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %v [flags] <YYYYMMDD.csv> ...\n", os.Args[0])
 		flag.PrintDefaults()
 	}
+	action := flag.String("action", "plot", `Action to perform ("plot", "summarize")`)
 	state := flag.String("state", "", `State as it appears in CSV files, e.g. "California", or empty for all`)
 	start := flag.String("start", now.AddDate(0, -3, 0).Format(dateLayout), `Starting week-ending date`)
 	end := flag.String("end", now.Format(dateLayout), `Ending week-ending date`)
@@ -66,22 +68,31 @@ func main() {
 		}
 	}
 
-	// Write the data to a temp file.
-	dp, err := writeData(ds)
-	if err != nil {
-		log.Fatal("Failed writing data file: ", err)
-	}
-	defer os.Remove(dp)
+	switch *action {
+	case "plot":
+		// Write the data to a temp file.
+		dp, err := writeData(ds)
+		if err != nil {
+			log.Fatal("Failed writing data file: ", err)
+		}
+		defer os.Remove(dp)
 
-	// Write the gnuplot commands to a temp file.
-	gp, err := writeGnuplot(ds, dp)
-	if err != nil {
-		log.Fatal("Failed writing gnuplot file: ", err)
-	}
-	defer os.Remove(gp)
+		// Write the gnuplot commands to a temp file.
+		gp, err := writeGnuplot(ds, dp)
+		if err != nil {
+			log.Fatal("Failed writing gnuplot file: ", err)
+		}
+		defer os.Remove(gp)
 
-	if err := exec.Command("gnuplot", "-p", gp).Run(); err != nil {
-		log.Fatal("Failed running gnuplot: ", err)
+		if err := exec.Command("gnuplot", "-p", gp).Run(); err != nil {
+			log.Fatal("Failed running gnuplot: ", err)
+		}
+	case "summarize":
+		if err := ds.summarize(os.Stdout); err != nil {
+			log.Fatal("Failed writing summary: ", err)
+		}
+	default:
+		log.Fatalf("Invalid action %q", *action)
 	}
 }
 
@@ -203,6 +214,26 @@ func newDataSet(state string, start, end time.Time, covid, predicted, excess boo
 		fileDates:  make(map[string]struct{}),
 		weekSeries: make(map[string]timeseries),
 	}
+}
+
+// sortedWeekEnds returns the keys (e.g. "20200425") from ds.weekSeries, sorted in ascending order.
+func (ds *dataSet) sortedWeekEnds() []string {
+	wes := make([]string, 0, len(ds.weekSeries))
+	for we := range ds.weekSeries {
+		wes = append(wes, we)
+	}
+	sort.Strings(wes)
+	return wes
+}
+
+// sortedFileDates returns the values (e.g. "20200425") from ds.fileDates, sorted in ascending order.
+func (ds *dataSet) sortedFileDates() []string {
+	fds := make([]string, 0, len(ds.fileDates))
+	for fd := range ds.fileDates {
+		fds = append(fds, fd)
+	}
+	sort.Strings(fds)
+	return fds
 }
 
 // readFile parses the CSV file at p.
@@ -348,17 +379,8 @@ func (ds *dataSet) write(w io.Writer) error {
 		}
 	}
 
-	weekEnds := make([]string, 0, len(ds.weekSeries))
-	for we := range ds.weekSeries {
-		weekEnds = append(weekEnds, we)
-	}
-	sort.Strings(weekEnds)
-
-	fileDates := make([]string, 0, len(ds.fileDates))
-	for fd := range ds.fileDates {
-		fileDates = append(fileDates, fd)
-	}
-	sort.Strings(fileDates)
+	weekEnds := ds.sortedWeekEnds()
+	fileDates := ds.sortedFileDates()
 
 	// Put line names on the first line.
 	weekStrings := make([]string, len(weekEnds))
@@ -381,6 +403,49 @@ func (ds *dataSet) write(w io.Writer) error {
 			}
 		}
 		write(strings.Join(vals, "\t") + "\n")
+	}
+
+	return writeErr
+}
+
+// summarize summarizes ds's data to w as human-readable text.
+func (ds *dataSet) summarize(w io.Writer) error {
+	var writeErr error
+	writef := func(format string, args ...interface{}) {
+		if writeErr == nil {
+			_, writeErr = fmt.Fprintf(w, format, args...)
+		}
+	}
+
+	const dl = "2006-01-02"
+
+	fileDates := ds.sortedFileDates()
+
+	for _, we := range ds.sortedWeekEnds() {
+		// Find the highest value.
+		ts := ds.weekSeries[we]
+		max := 0
+		for _, v := range ts {
+			if v > max {
+				max = v
+			}
+		}
+		if max == 0 {
+			continue
+		}
+
+		wt, _ := time.Parse(dateLayout, we)
+		writef("Week ending %s\n", wt.Format(dl))
+
+		for _, fd := range fileDates {
+			if v, ok := ts[fd]; ok {
+				ft, _ := time.Parse(dateLayout, fd)
+				days := int(math.Round(float64(ft.Sub(wt)) / float64(24*time.Hour)))
+				pct := float64(v) / float64(max) * 100
+				writef("%s  %5v  %5.1f%% of max after %dd)\n", ft.Format(dl), v, pct, days)
+			}
+		}
+		writef("\n")
 	}
 
 	return writeErr
