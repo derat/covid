@@ -103,6 +103,13 @@ func (a *ageRange) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+func (a *ageRange) min() int {
+	if *a == ageNA {
+		return -1
+	}
+	return (int(*a) - 1) * 10
+}
+
 type testType int
 
 const (

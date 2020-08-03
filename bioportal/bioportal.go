@@ -6,6 +6,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"reflect"
 	"sort"
 	"time"
 )
@@ -57,29 +58,35 @@ func main() {
 
 		if colValid {
 			s := colStats[col]
-			s.update(t.Result, delay)
+			s.update(t.Result, t.AgeRange, delay)
 			colStats[col] = s
 		}
 
 		if repValid {
 			s := repStats[rep]
-			s.update(t.Result, delay)
+			s.update(t.Result, t.AgeRange, delay)
 			repStats[rep] = s
 		}
 	}
 
-	printStats(repStats)
+	//printStats(repStats)
+	writeAgeData("positives-age.data", repStats)
 }
 
 type stats struct {
 	pos, neg, other int   // number of tests by result
 	delays          []int // reporting delays in ascending order
+	agePos          map[ageRange]int
 }
 
-func (s *stats) update(res result, delay int) {
+func (s *stats) update(res result, ar ageRange, delay int) {
 	switch res {
 	case positive:
 		s.pos++
+		if s.agePos == nil {
+			s.agePos = make(map[ageRange]int)
+		}
+		s.agePos[ar]++
 	case negative:
 		s.neg++
 	default:
@@ -107,11 +114,7 @@ func (s *stats) delayPct(pct float64) int {
 }
 
 func printStats(m map[time.Time]stats) {
-	days := make([]time.Time, 0, len(m))
-	for d := range m {
-		days = append(days, d)
-	}
-	sort.Slice(days, func(i, j int) bool { return days[i].Before(days[j]) })
+	days := sortedTimes(m)
 
 	for i, d := range days {
 		s := m[d]
@@ -128,4 +131,59 @@ func printStats(m map[time.Time]stats) {
 		fmt.Printf("%s: %4d %4.1f%% [%d %d %d]\n", d.Format("2006-01-02"), s.total(),
 			100*float64(ws.pos)/float64(ws.total()), s.delayPct(20), s.delayPct(50), s.delayPct(80))
 	}
+}
+
+func writeAgeData(p string, m map[time.Time]stats) error {
+	f, err := os.Create(p)
+	if err != nil {
+		return err
+	}
+
+	var werr error
+	writef := func(format string, args ...interface{}) {
+		if werr != nil {
+			return
+		}
+		_, werr = fmt.Fprintf(f, format, args...)
+	}
+
+	writef("X\tDate\tAge\tPositive Tests\n")
+
+	// Aggregate positives by week.
+	wm := make(map[time.Time]map[ageRange]int)
+	for d, s := range m {
+		wd := d.AddDate(0, 0, -1*int(d.Weekday())) // subtract to sunday
+		am := wm[wd]
+		if am == nil {
+			am = make(map[ageRange]int)
+		}
+		for ar := age0To9; ar <= age100To109; ar++ {
+			am[ar] += s.agePos[ar]
+		}
+		wm[wd] = am
+	}
+
+	for i, d := range sortedTimes(wm) {
+		am := wm[d]
+		for ar := age0To9; ar <= age100To109; ar++ {
+			writef("%d\t%s\t%d\t%d\n", i, d.Format("01/02"), ar.min(), am[ar])
+		}
+	}
+
+	cerr := f.Close()
+	if werr != nil {
+		return werr
+	}
+	return cerr
+}
+
+// sortedTimes returns sorted keys from m, which must be a map with time.Time keys.
+// See https://stackoverflow.com/a/35366762.
+func sortedTimes(m interface{}) []time.Time {
+	var keys []time.Time
+	for _, k := range reflect.ValueOf(m).MapKeys() {
+		keys = append(keys, k.Interface().(time.Time))
+	}
+	sort.Slice(keys, func(i, j int) bool { return keys[i].Before(keys[j]) })
+	return keys
 }
