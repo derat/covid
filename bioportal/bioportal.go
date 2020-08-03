@@ -12,7 +12,8 @@ import (
 )
 
 const (
-	filename = "minimal-info-unique-tests"
+	inputFile  = "minimal-info-unique-tests"
+	posAgeFile = "positives-age.data"
 )
 
 var (
@@ -29,7 +30,7 @@ func init() {
 }
 
 func main() {
-	f, err := os.Open(filename)
+	f, err := os.Open(inputFile)
 	if err != nil {
 		log.Fatal("Failed opening file: ", err)
 	}
@@ -70,7 +71,7 @@ func main() {
 	}
 
 	//printStats(repStats)
-	writeAgeData("positives-age.data", repStats)
+	writeAgeData(posAgeFile, repStats)
 }
 
 type stats struct {
@@ -134,20 +135,10 @@ func printStats(m map[time.Time]stats) {
 }
 
 func writeAgeData(p string, m map[time.Time]stats) error {
-	f, err := os.Create(p)
+	fw, err := newFileWriter(p)
 	if err != nil {
 		return err
 	}
-
-	var werr error
-	writef := func(format string, args ...interface{}) {
-		if werr != nil {
-			return
-		}
-		_, werr = fmt.Fprintf(f, format, args...)
-	}
-
-	writef("X\tDate\tAge\tPositive Tests\n")
 
 	// Aggregate positives by week.
 	wm := make(map[time.Time]map[ageRange]int)
@@ -163,18 +154,15 @@ func writeAgeData(p string, m map[time.Time]stats) error {
 		wm[wd] = am
 	}
 
+	fw.printf("X\tDate\tAge\tPositive Tests\n")
 	for i, d := range sortedTimes(wm) {
 		am := wm[d]
 		for ar := age0To9; ar <= age100To109; ar++ {
-			writef("%d\t%s\t%d\t%d\n", i, d.Format("01/02"), ar.min(), am[ar])
+			fw.printf("%d\t%s\t%d\t%d\n", i, d.Format("01/02"), ar.min(), am[ar])
 		}
 	}
 
-	cerr := f.Close()
-	if werr != nil {
-		return werr
-	}
-	return cerr
+	return fw.close()
 }
 
 // sortedTimes returns sorted keys from m, which must be a map with time.Time keys.
