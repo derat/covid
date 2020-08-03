@@ -1,4 +1,5 @@
-states="AZ CA FL NJ NV NY TX"
+states=system("echo $STATES")
+if (states eq "") states="AZ CA FL GA NV TX"
 
 set title "Cumulative COVID-19 deaths in " . states
 set timefmt '%Y%m%d'
