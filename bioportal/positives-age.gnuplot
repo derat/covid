@@ -1,4 +1,4 @@
-set title 'Puerto Rico weekly positive reported tests by age'
+set title 'Puerto Rico weekly reported positive COVID-19 tests by age'
 
 # Plot data initially to set GPVAL_DATA_* variables:
 # http://www.phyast.pitt.edu/~zov1/gnuplot/html/statistics.html

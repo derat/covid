@@ -14,6 +14,7 @@ import (
 const (
 	inputFile  = "minimal-info-unique-tests"
 	posAgeFile = "positives-age.data"
+	delaysFile = "delays.data"
 )
 
 var (
@@ -72,6 +73,7 @@ func main() {
 
 	//printStats(repStats)
 	writeAgeData(posAgeFile, repStats)
+	writeDelaysData(delaysFile, repStats)
 }
 
 type stats struct {
@@ -162,6 +164,30 @@ func writeAgeData(p string, m map[time.Time]stats) error {
 		}
 	}
 
+	return fw.close()
+}
+
+func writeDelaysData(p string, m map[time.Time]stats) error {
+	fw, err := newFileWriter(p)
+	if err != nil {
+		return err
+	}
+
+	wm := make(map[time.Time]stats)
+	for d, s := range m {
+		wd := d.AddDate(0, 0, -1*int(d.Weekday())) // subtract to sunday
+		ws := wm[wd]
+		ws.delays = append(ws.delays, s.delays...)
+		wm[wd] = ws
+	}
+
+	fw.printf("Date\t20th\t50th\t80th\n")
+	for _, d := range sortedTimes(wm) {
+		s := wm[d]
+		sort.Ints(s.delays)
+		fw.printf("%s\t%d\t%d\t%d\n", d.Format("2006-01-02"),
+			s.delayPct(20), s.delayPct(50), s.delayPct(80))
+	}
 	return fw.close()
 }
 
