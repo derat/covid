@@ -181,12 +181,12 @@ func writeDelaysData(p string, m map[time.Time]stats) error {
 		wm[wd] = ws
 	}
 
-	fw.printf("Date\t20th\t50th\t80th\n")
+	fw.printf("Date\t25th\t50th\t75th\n")
 	for _, d := range sortedTimes(wm) {
 		s := wm[d]
 		sort.Ints(s.delays)
 		fw.printf("%s\t%d\t%d\t%d\n", d.Format("2006-01-02"),
-			s.delayPct(20), s.delayPct(50), s.delayPct(80))
+			s.delayPct(25), s.delayPct(50), s.delayPct(75))
 	}
 	return fw.close()
 }
