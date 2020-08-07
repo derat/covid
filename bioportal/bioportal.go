@@ -30,7 +30,7 @@ func init() {
 	if loc, err = time.LoadLocation("America/Puerto_Rico"); err != nil {
 		panic(err)
 	}
-	startDate = time.Date(2020, 2, 1, 0, 0, 0, 0, loc)
+	startDate = time.Date(2020, 3, 12, 0, 0, 0, 0, loc)
 }
 
 func main() {
@@ -40,19 +40,28 @@ func main() {
 	}
 	defer f.Close()
 
-	var tests []test
-	if err := json.NewDecoder(f).Decode(&tests); err != nil {
-		log.Fatal("Failed decoding data: ", err)
-	}
-
 	now := time.Now()
 	colStats := make(statsMap)
 	repStats := make(statsMap)
 
-	for _, t := range tests {
+	// Instead of unmarshaling all tests into slice all at once, strip off the
+	// opening bracket so we can read them one at a time. See the "Stream"
+	// example at https://golang.org/pkg/encoding/json/#Decoder.Decode.
+	dec := json.NewDecoder(f)
+	if t, err := dec.Token(); err != nil {
+		log.Fatal("Failed reading opening bracket: ", err)
+	} else if d, ok := t.(json.Delim); !ok || d != '[' {
+		log.Fatalf("Data starts with %v instead of opening bracket", t)
+	}
+
+	for dec.More() {
+		var t test
+		if err := dec.Decode(&t); err != nil {
+			log.Fatal("Failed reading test: ", err)
+		}
+
 		col := time.Time(t.Collected)
 		colValid := !col.Before(startDate) && !col.After(now)
-
 		rep := time.Time(t.Reported)
 		repValid := !rep.Before(startDate) && !rep.After(now)
 
@@ -66,7 +75,6 @@ func main() {
 			s.update(t.Result, t.AgeRange, delay)
 			colStats[col] = s
 		}
-
 		if repValid {
 			s := repStats[rep]
 			s.update(t.Result, t.AgeRange, delay)
@@ -74,10 +82,15 @@ func main() {
 		}
 	}
 
+	if t, err := dec.Token(); err != nil {
+		log.Fatal("Failed reading closing bracket: ", err)
+	} else if d, ok := t.(json.Delim); !ok || d != ']' {
+		log.Fatalf("Data ends with %v instead of closing bracket", t)
+	}
+
 	for _, d := range sortedTimes(repStats) {
 		fmt.Printf("%s: %s\n", d.Format("2006-01-02"), repStats[d])
 	}
-
 	writeAgeData(posAgeFile, repStats)
 	writeDelaysData(delaysFile, repStats)
 }

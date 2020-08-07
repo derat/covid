@@ -19,7 +19,7 @@ type stats struct {
 }
 
 func (s stats) String() string {
-	str := fmt.Sprintf("%4dp %4dn %2do (%0.1f%%)",
+	str := fmt.Sprintf("%3d %4d %2d %4.1f%%",
 		s.pos, s.neg, s.other, 100*float64(s.pos)/float64(s.total()))
 	if len(s.delays) > 0 {
 		str += fmt.Sprintf(" [%d %d %d %d %d]",
