@@ -1,3 +1,6 @@
+// Copyright 2020 Daniel Erat <dan@erat.org>.
+// All rights reserved.
+
 package main
 
 import (
@@ -43,8 +46,8 @@ func main() {
 	}
 
 	now := time.Now()
-	colStats := make(map[time.Time]stats)
-	repStats := make(map[time.Time]stats)
+	colStats := make(statsMap)
+	repStats := make(statsMap)
 
 	for _, t := range tests {
 		col := time.Time(t.Collected)
@@ -71,72 +74,15 @@ func main() {
 		}
 	}
 
-	//printStats(repStats)
+	for _, d := range sortedTimes(repStats) {
+		fmt.Printf("%s: %s\n", d.Format("2006-01-02"), repStats[d])
+	}
+
 	writeAgeData(posAgeFile, repStats)
 	writeDelaysData(delaysFile, repStats)
 }
 
-type stats struct {
-	pos, neg, other int   // number of tests by result
-	delays          []int // reporting delays in ascending order
-	agePos          map[ageRange]int
-}
-
-func (s *stats) update(res result, ar ageRange, delay int) {
-	switch res {
-	case positive:
-		s.pos++
-		if s.agePos == nil {
-			s.agePos = make(map[ageRange]int)
-		}
-		s.agePos[ar]++
-	case negative:
-		s.neg++
-	default:
-		s.other++
-	}
-
-	if delay >= 0 {
-		// Insert delay at correct position.
-		i := sort.SearchInts(s.delays, delay)
-		s.delays = append(s.delays, 0)
-		copy(s.delays[i+1:], s.delays[i:])
-		s.delays[i] = delay
-	}
-}
-
-func (s *stats) total() int {
-	return s.pos + s.neg + s.other
-}
-
-func (s *stats) delayPct(pct float64) int {
-	if len(s.delays) == 0 {
-		return 0
-	}
-	return s.delays[int(math.Round(pct*float64(len(s.delays)-1)/100))]
-}
-
-func printStats(m map[time.Time]stats) {
-	days := sortedTimes(m)
-
-	for i, d := range days {
-		s := m[d]
-
-		// Sum the test results over the past week.
-		var ws stats
-		for j := int(math.Max(float64(i-6), 0)); j <= i; j++ {
-			ds := m[days[j]]
-			ws.pos += ds.pos
-			ws.neg += ds.neg
-			ws.other += ds.other
-		}
-
-		fmt.Printf("%s: %4d %4.1f%% [%d %d %d]\n", d.Format("2006-01-02"), s.total(),
-			100*float64(ws.pos)/float64(ws.total()), s.delayPct(20), s.delayPct(50), s.delayPct(80))
-	}
-}
-
-func writeAgeData(p string, m map[time.Time]stats) error {
+func writeAgeData(p string, m statsMap) error {
 	fw, err := newFileWriter(p)
 	if err != nil {
 		return err
@@ -167,13 +113,13 @@ func writeAgeData(p string, m map[time.Time]stats) error {
 	return fw.close()
 }
 
-func writeDelaysData(p string, m map[time.Time]stats) error {
+func writeDelaysData(p string, m statsMap) error {
 	fw, err := newFileWriter(p)
 	if err != nil {
 		return err
 	}
 
-	wm := make(map[time.Time]stats)
+	wm := make(statsMap)
 	for d, s := range m {
 		wd := d.AddDate(0, 0, -1*int(d.Weekday())) // subtract to sunday
 		ws := wm[wd]

@@ -1,3 +1,6 @@
+// Copyright 2020 Daniel Erat <dan@erat.org>.
+// All rights reserved.
+
 package main
 
 import (
@@ -6,6 +9,9 @@ import (
 	"time"
 )
 
+// test represents the result of an individual test reported to the Bioportal.
+// Each test is described as a JSON object:
+//
 //  {
 //    "collectedDate": "6/25/2020",
 //    "reportedDate": "6/25/2020",
@@ -13,13 +19,15 @@ import (
 //    "testType": "Molecular",
 //    "result": "Negative",
 //    "patientCity": "Las Piedras",
-//    "createdAt":"06/30/2020 13:49"
+//    "patientId": "5161e02e-8aca-4c50-9a16-0007ec5f5e51",
+//    "createdAt": "06/30/2020 13:49"
 //  }
 type test struct {
 	Collected   jsonDate `json:"collectedDate"`
 	Reported    jsonDate `json:"reportedDate"`
 	AgeRange    ageRange `json:"ageRange"`
 	Result      result   `json:"result"`
+	PatientID   string   `json:"patientId"`
 	PatientCity string   `json:"patientCity"`
 	Created     jsonTime `json:"createdAt"`
 }
