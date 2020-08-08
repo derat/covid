@@ -118,16 +118,16 @@ func main() {
 	for _, d := range sortedTimes(repStats) {
 		fmt.Printf("%s: %s\n", d.Format("2006-01-02"), repStats[d])
 	}
-	writeAgeData(posAgeFile, repStats)
-	writeDelaysData(delaysFile, repStats)
+
+	if err := writeAgeData(posAgeFile, repStats); err != nil {
+		log.Fatal("Failed writing age data: ", err)
+	}
+	if err := writeDelaysData(delaysFile, repStats); err != nil {
+		log.Fatal("Failed writing delays data: ", err)
+	}
 }
 
 func writeAgeData(p string, m statsMap) error {
-	fw, err := filewriter.New(p)
-	if err != nil {
-		return err
-	}
-
 	// Aggregate positives by week.
 	wm := make(map[time.Time]map[ageRange]int)
 	for d, s := range m {
@@ -142,6 +142,7 @@ func writeAgeData(p string, m statsMap) error {
 		wm[wd] = am
 	}
 
+	fw := filewriter.New(p)
 	fw.Printf("X\tDate\tAge\tPositive Tests\n")
 	for i, d := range sortedTimes(wm) {
 		am := wm[d]
@@ -149,16 +150,10 @@ func writeAgeData(p string, m statsMap) error {
 			fw.Printf("%d\t%s\t%d\t%d\n", i, d.Format("01/02"), ar.min(), am[ar])
 		}
 	}
-
 	return fw.Close()
 }
 
 func writeDelaysData(p string, m statsMap) error {
-	fw, err := filewriter.New(p)
-	if err != nil {
-		return err
-	}
-
 	wm := make(statsMap)
 	for d, s := range m {
 		wd := d.AddDate(0, 0, -1*int(d.Weekday())) // subtract to sunday
@@ -167,6 +162,7 @@ func writeDelaysData(p string, m statsMap) error {
 		wm[wd] = ws
 	}
 
+	fw := filewriter.New(p)
 	fw.Printf("Date\t25th\t50th\t75th\n")
 	for _, d := range sortedTimes(wm) {
 		s := wm[d]
