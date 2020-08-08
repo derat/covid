@@ -3,6 +3,27 @@
 
 package main
 
+import (
+	"fmt"
+	"time"
+)
+
+func templateData(dataPath, imgPath string, now time.Time) interface{} {
+	return struct {
+		DataPath    string // path to gnuplot data file
+		SetTerm     string // 'set term' command for writing PNG image data
+		SetOutput   string // 'set output' command for writing to image file
+		FooterLabel string // 'set label' command for writing footer label
+	}{
+		DataPath:  dataPath,
+		SetTerm:   "set term pngcairo font 'Roboto,22' size 1280,960",
+		SetOutput: fmt.Sprintf("set output '%s'", imgPath),
+		FooterLabel: fmt.Sprintf(
+			"set label front '{/*0.7 Generated on %s by https://github.com/derat/covid}' at screen 0.99,0.025 right",
+			time.Now().Format("2006-01-02")),
+	}
+}
+
 const (
 	posAgeTmpl = `
 set title 'Puerto Rico Bioportal positive COVID-19 tests by age'
@@ -43,7 +64,7 @@ set key top left
 set bmargin 5
 {{.FooterLabel}}
 
-plot '{{.DataPath}}' using 1:3 with lines lc 'blue' lw 3 title 'Median', \
-     '{{.DataPath}}' using 1:2:4 with filledcurves lc 'skyblue' fs transparent solid 0.25 title '1st-3rd Quartile'
+plot '{{.DataPath}}' using 1:3 with lines lc rgb '#0D47A1' lw 3 title 'Median', \
+     '{{.DataPath}}' using 1:2:4 with filledcurves lc rgb '#448AFF' fs transparent solid 0.25 title '1st-3rd Quartile'
 `
 )
