@@ -21,6 +21,14 @@ import (
 	"github.com/derat/covid/gnuplot"
 )
 
+const (
+	repoURL     = "https://github.com/derat/covid"
+	fontName    = "Roboto"
+	fontSize    = 22
+	imageWidth  = 1280
+	imageHeight = 960
+)
+
 var (
 	loc       *time.Location // PR time zone
 	startDate time.Time      // earliest date to accept
@@ -113,7 +121,7 @@ func main() {
 			},
 		},
 		{
-			out:  "delays.png",
+			out:  "result-delays.png",
 			tmpl: delaysTmpl,
 			data: func(w *filewriter.FileWriter) {
 				m := make(statsMap)
@@ -139,9 +147,12 @@ func main() {
 		if err := dw.Close(); err != nil {
 			log.Fatalf("Failed writing data for %v: %v", plot.out, err)
 		}
-		if err := gnuplot.ExecTemplate(plot.tmpl, struct{ DataPath, ImagePath string }{
+		if err := gnuplot.ExecTemplate(plot.tmpl, struct{ DataPath, SetTerm, SetOutput, FooterLabel string }{
 			DataPath:  dp,
-			ImagePath: filepath.Join(outDir, plot.out),
+			SetTerm:   fmt.Sprintf("set term pngcairo font '%s,%d' size %d,%d", fontName, fontSize, imageWidth, imageHeight),
+			SetOutput: fmt.Sprintf("set output '%s'", filepath.Join(outDir, plot.out)),
+			FooterLabel: fmt.Sprintf("set label front '{/*0.7 Generated on %s by %s}' at screen 0.99,0.025 right",
+				time.Now().Format("2006-01-02"), repoURL),
 		}); err != nil {
 			log.Fatalf("Failed plotting %v: %v", plot.out, err)
 		}

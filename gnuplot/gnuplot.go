@@ -5,9 +5,11 @@
 package gnuplot
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"strings"
 	"text/template"
 )
 
@@ -29,5 +31,12 @@ func ExecTemplate(tmpl string, data interface{}) error {
 	if cerr != nil {
 		return cerr
 	}
-	return exec.Command("gnuplot", gf.Name()).Run()
+
+	if err := exec.Command("gnuplot", gf.Name()).Run(); err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok && len(exitErr.Stderr) != 0 {
+			return fmt.Errorf("%v: %q", err, strings.TrimSpace(string(exitErr.Stderr)))
+		}
+		return err
+	}
+	return nil
 }
