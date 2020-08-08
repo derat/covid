@@ -4,18 +4,21 @@
 package main
 
 import (
+	"compress/gzip"
 	"encoding/json"
+	"flag"
 	"fmt"
+	"io"
 	"log"
 	"math"
 	"os"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"time"
 )
 
 const (
-	inputFile  = "minimal-info-unique-tests"
 	posAgeFile = "positives-age.data"
 	delaysFile = "delays.data"
 )
@@ -34,11 +37,33 @@ func init() {
 }
 
 func main() {
-	f, err := os.Open(inputFile)
+	flag.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %v <input>\n", os.Args[0])
+		flag.PrintDefaults()
+	}
+	flag.Parse()
+
+	if len(flag.Args()) != 1 {
+		flag.Usage()
+		os.Exit(2)
+	}
+
+	fn := flag.Arg(0)
+	f, err := os.Open(fn)
 	if err != nil {
-		log.Fatal("Failed opening file: ", err)
+		log.Fatal("Failed opening input: ", err)
 	}
 	defer f.Close()
+
+	var r io.Reader = f
+	if filepath.Ext(fn) == ".gz" {
+		gr, err := gzip.NewReader(f)
+		if err != nil {
+			log.Fatal("Failed decompressing input: ", err)
+		}
+		defer gr.Close()
+		r = gr
+	}
 
 	now := time.Now()
 	colStats := make(statsMap)
@@ -47,7 +72,7 @@ func main() {
 	// Instead of unmarshaling all tests into slice all at once, strip off the
 	// opening bracket so we can read them one at a time. See the "Stream"
 	// example at https://golang.org/pkg/encoding/json/#Decoder.Decode.
-	dec := json.NewDecoder(f)
+	dec := json.NewDecoder(r)
 	if t, err := dec.Token(); err != nil {
 		log.Fatal("Failed reading opening bracket: ", err)
 	} else if d, ok := t.(json.Delim); !ok || d != '[' {
