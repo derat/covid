@@ -81,11 +81,71 @@ func main() {
 		log.Fatal("Failed creating output dir: ", err)
 	}
 
-	if err := plotAges(filepath.Join(outDir, "positives-age.png"), repStats); err != nil {
-		log.Fatal("Failed plotting ages: ", err)
-	}
-	if err := plotDelays(filepath.Join(outDir, "delays.png"), repStats); err != nil {
-		log.Fatal("Failed plotting delays: ", err)
+	for _, plot := range []struct {
+		out  string                         // output file, e.g. "my-plot.png"
+		tmpl string                         // gnuplot template data
+		data func(w *filewriter.FileWriter) // writes gnuplot data to w
+	}{
+		{
+			out:  "positives-age.png",
+			tmpl: posAgeTmpl,
+			data: func(w *filewriter.FileWriter) {
+				// Aggregate positives by week.
+				m := make(map[time.Time]map[ageRange]int)
+				for d, s := range repStats {
+					week := d.AddDate(0, 0, -1*int(d.Weekday())) // subtract to sunday
+					am := m[week]
+					if am == nil {
+						am = make(map[ageRange]int)
+					}
+					for ar := age0To9; ar <= age100To109; ar++ {
+						am[ar] += s.agePos[ar]
+					}
+					m[week] = am
+				}
+				w.Printf("X\tDate\tAge\tPositive Tests\n")
+				for i, week := range sortedTimes(m) {
+					am := m[week]
+					for ar := age0To9; ar <= age100To109; ar++ {
+						w.Printf("%d\t%s\t%d\t%d\n", i, week.Format("01/02"), ar.min(), am[ar])
+					}
+				}
+			},
+		},
+		{
+			out:  "delays.png",
+			tmpl: delaysTmpl,
+			data: func(w *filewriter.FileWriter) {
+				m := make(statsMap)
+				for d, s := range repStats {
+					week := d.AddDate(0, 0, -1*int(d.Weekday())) // subtract to sunday
+					ws := m[week]
+					ws.delays = append(ws.delays, s.delays...)
+					m[week] = ws
+				}
+				w.Printf("Date\t25th\t50th\t75th\n")
+				for _, week := range sortedTimes(m) {
+					s := m[week]
+					sort.Ints(s.delays)
+					w.Printf("%s\t%d\t%d\t%d\n", week.Format("2006-01-02"),
+						s.delayPct(25), s.delayPct(50), s.delayPct(75))
+				}
+			},
+		},
+	} {
+		dp := filepath.Join("/tmp", "bioportal."+plot.out+".dat")
+		dw := filewriter.New(dp)
+		plot.data(dw)
+		if err := dw.Close(); err != nil {
+			log.Fatalf("Failed writing data for %v: %v", plot.out, err)
+		}
+		if err := gnuplot.ExecTemplate(plot.tmpl, struct{ DataPath, ImagePath string }{
+			DataPath:  dp,
+			ImagePath: filepath.Join(outDir, plot.out),
+		}); err != nil {
+			log.Fatalf("Failed plotting %v: %v", plot.out, err)
+		}
+		os.Remove(dp)
 	}
 }
 
@@ -140,68 +200,6 @@ func readTests(r io.Reader) (colStats, repStats statsMap, err error) {
 		return nil, nil, fmt.Errorf("data ends with %v instead of closing bracket", t)
 	}
 	return colStats, repStats, nil
-}
-
-func plotAges(out string, m statsMap) error {
-	// Aggregate positives by week.
-	wm := make(map[time.Time]map[ageRange]int)
-	for d, s := range m {
-		wd := d.AddDate(0, 0, -1*int(d.Weekday())) // subtract to sunday
-		am := wm[wd]
-		if am == nil {
-			am = make(map[ageRange]int)
-		}
-		for ar := age0To9; ar <= age100To109; ar++ {
-			am[ar] += s.agePos[ar]
-		}
-		wm[wd] = am
-	}
-
-	dp := filepath.Join("/tmp", filepath.Base(out)+".dat")
-	defer os.Remove(dp)
-	dw := filewriter.New(dp)
-	dw.Printf("X\tDate\tAge\tPositive Tests\n")
-	for i, d := range sortedTimes(wm) {
-		am := wm[d]
-		for ar := age0To9; ar <= age100To109; ar++ {
-			dw.Printf("%d\t%s\t%d\t%d\n", i, d.Format("01/02"), ar.min(), am[ar])
-		}
-	}
-	if err := dw.Close(); err != nil {
-		return err
-	}
-	return gnuplot.ExecTemplate(posAgeTmpl, struct{ DataPath, ImagePath string }{
-		DataPath:  dp,
-		ImagePath: out,
-	})
-}
-
-func plotDelays(out string, m statsMap) error {
-	wm := make(statsMap)
-	for d, s := range m {
-		wd := d.AddDate(0, 0, -1*int(d.Weekday())) // subtract to sunday
-		ws := wm[wd]
-		ws.delays = append(ws.delays, s.delays...)
-		wm[wd] = ws
-	}
-
-	dp := filepath.Join("/tmp", filepath.Base(out)+".dat")
-	defer os.Remove(dp)
-	dw := filewriter.New(dp)
-	dw.Printf("Date\t25th\t50th\t75th\n")
-	for _, d := range sortedTimes(wm) {
-		s := wm[d]
-		sort.Ints(s.delays)
-		dw.Printf("%s\t%d\t%d\t%d\n", d.Format("2006-01-02"),
-			s.delayPct(25), s.delayPct(50), s.delayPct(75))
-	}
-	if err := dw.Close(); err != nil {
-		return err
-	}
-	return gnuplot.ExecTemplate(delaysTmpl, struct{ DataPath, ImagePath string }{
-		DataPath:  dp,
-		ImagePath: out,
-	})
 }
 
 // sortedTimes returns sorted keys from m, which must be a map with time.Time keys.
