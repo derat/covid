@@ -18,11 +18,7 @@ import (
 	"time"
 
 	"github.com/derat/covid/filewriter"
-)
-
-const (
-	posAgeFile = "positives-age.data"
-	delaysFile = "delays.data"
+	"github.com/derat/covid/gnuplot"
 )
 
 var (
@@ -40,12 +36,12 @@ func init() {
 
 func main() {
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %v <input>\n", os.Args[0])
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %v <input> <output-dir>\n", os.Args[0])
 		flag.PrintDefaults()
 	}
 	flag.Parse()
 
-	if len(flag.Args()) != 1 {
+	if len(flag.Args()) != 2 {
 		flag.Usage()
 		os.Exit(2)
 	}
@@ -65,6 +61,11 @@ func main() {
 		}
 		defer gr.Close()
 		r = gr
+	}
+
+	outDir := flag.Arg(1)
+	if err := os.MkdirAll(outDir, 0755); err != nil {
+		log.Fatal("Failed creating output dir: ", err)
 	}
 
 	now := time.Now()
@@ -119,15 +120,15 @@ func main() {
 		fmt.Printf("%s: %s\n", d.Format("2006-01-02"), repStats[d])
 	}
 
-	if err := writeAgeData(posAgeFile, repStats); err != nil {
-		log.Fatal("Failed writing age data: ", err)
+	if err := plotAges(filepath.Join(outDir, "positives-age.png"), repStats); err != nil {
+		log.Fatal("Failed plotting ages: ", err)
 	}
-	if err := writeDelaysData(delaysFile, repStats); err != nil {
-		log.Fatal("Failed writing delays data: ", err)
+	if err := plotDelays(filepath.Join(outDir, "delays.png"), repStats); err != nil {
+		log.Fatal("Failed plotting delays: ", err)
 	}
 }
 
-func writeAgeData(p string, m statsMap) error {
+func plotAges(out string, m statsMap) error {
 	// Aggregate positives by week.
 	wm := make(map[time.Time]map[ageRange]int)
 	for d, s := range m {
@@ -142,18 +143,26 @@ func writeAgeData(p string, m statsMap) error {
 		wm[wd] = am
 	}
 
-	fw := filewriter.New(p)
-	fw.Printf("X\tDate\tAge\tPositive Tests\n")
+	dp := filepath.Join("/tmp", filepath.Base(out)+".dat")
+	defer os.Remove(dp)
+	dw := filewriter.New(dp)
+	dw.Printf("X\tDate\tAge\tPositive Tests\n")
 	for i, d := range sortedTimes(wm) {
 		am := wm[d]
 		for ar := age0To9; ar <= age100To109; ar++ {
-			fw.Printf("%d\t%s\t%d\t%d\n", i, d.Format("01/02"), ar.min(), am[ar])
+			dw.Printf("%d\t%s\t%d\t%d\n", i, d.Format("01/02"), ar.min(), am[ar])
 		}
 	}
-	return fw.Close()
+	if err := dw.Close(); err != nil {
+		return err
+	}
+	return gnuplot.ExecTemplate(posAgeTmpl, struct{ DataPath, ImagePath string }{
+		DataPath:  dp,
+		ImagePath: out,
+	})
 }
 
-func writeDelaysData(p string, m statsMap) error {
+func plotDelays(out string, m statsMap) error {
 	wm := make(statsMap)
 	for d, s := range m {
 		wd := d.AddDate(0, 0, -1*int(d.Weekday())) // subtract to sunday
@@ -162,15 +171,23 @@ func writeDelaysData(p string, m statsMap) error {
 		wm[wd] = ws
 	}
 
-	fw := filewriter.New(p)
-	fw.Printf("Date\t25th\t50th\t75th\n")
+	dp := filepath.Join("/tmp", filepath.Base(out)+".dat")
+	defer os.Remove(dp)
+	dw := filewriter.New(dp)
+	dw.Printf("Date\t25th\t50th\t75th\n")
 	for _, d := range sortedTimes(wm) {
 		s := wm[d]
 		sort.Ints(s.delays)
-		fw.Printf("%s\t%d\t%d\t%d\n", d.Format("2006-01-02"),
+		dw.Printf("%s\t%d\t%d\t%d\n", d.Format("2006-01-02"),
 			s.delayPct(25), s.delayPct(50), s.delayPct(75))
 	}
-	return fw.Close()
+	if err := dw.Close(); err != nil {
+		return err
+	}
+	return gnuplot.ExecTemplate(delaysTmpl, struct{ DataPath, ImagePath string }{
+		DataPath:  dp,
+		ImagePath: out,
+	})
 }
 
 // sortedTimes returns sorted keys from m, which must be a map with time.Time keys.
