@@ -16,6 +16,8 @@ import (
 	"reflect"
 	"sort"
 	"time"
+
+	"github.com/derat/covid/filewriter"
 )
 
 const (
@@ -121,7 +123,7 @@ func main() {
 }
 
 func writeAgeData(p string, m statsMap) error {
-	fw, err := newFileWriter(p)
+	fw, err := filewriter.New(p)
 	if err != nil {
 		return err
 	}
@@ -140,19 +142,19 @@ func writeAgeData(p string, m statsMap) error {
 		wm[wd] = am
 	}
 
-	fw.printf("X\tDate\tAge\tPositive Tests\n")
+	fw.Printf("X\tDate\tAge\tPositive Tests\n")
 	for i, d := range sortedTimes(wm) {
 		am := wm[d]
 		for ar := age0To9; ar <= age100To109; ar++ {
-			fw.printf("%d\t%s\t%d\t%d\n", i, d.Format("01/02"), ar.min(), am[ar])
+			fw.Printf("%d\t%s\t%d\t%d\n", i, d.Format("01/02"), ar.min(), am[ar])
 		}
 	}
 
-	return fw.close()
+	return fw.Close()
 }
 
 func writeDelaysData(p string, m statsMap) error {
-	fw, err := newFileWriter(p)
+	fw, err := filewriter.New(p)
 	if err != nil {
 		return err
 	}
@@ -165,14 +167,14 @@ func writeDelaysData(p string, m statsMap) error {
 		wm[wd] = ws
 	}
 
-	fw.printf("Date\t25th\t50th\t75th\n")
+	fw.Printf("Date\t25th\t50th\t75th\n")
 	for _, d := range sortedTimes(wm) {
 		s := wm[d]
 		sort.Ints(s.delays)
-		fw.printf("%s\t%d\t%d\t%d\n", d.Format("2006-01-02"),
+		fw.Printf("%s\t%d\t%d\t%d\n", d.Format("2006-01-02"),
 			s.delayPct(25), s.delayPct(50), s.delayPct(75))
 	}
-	return fw.close()
+	return fw.Close()
 }
 
 // sortedTimes returns sorted keys from m, which must be a map with time.Time keys.
