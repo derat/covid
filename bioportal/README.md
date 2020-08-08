@@ -3,7 +3,7 @@
 COVID-19 test results produced by private laboratories can be downloaded from
 the (undocumented?) [Bioportal API]. As of 2020-08-08, this URL hangs for a few
 minutes before producing an 80 MB JSON array of objects describing results
-(represented by the `test` struct in [test.go](./test.go).
+(represented by the `test` struct in [test.go](./test.go)).
 
 Per [reporting by Primera Hora], positivity rates computed from the Bioportal's
 data are inaccurate due to negative results often lagging behind positive
