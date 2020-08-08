@@ -36,12 +36,12 @@ func init() {
 
 func main() {
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %v <input> <output-dir>\n", os.Args[0])
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %v <input> [out-dir]\n", os.Args[0])
 		flag.PrintDefaults()
 	}
 	flag.Parse()
 
-	if len(flag.Args()) != 2 {
+	if ln := len(flag.Args()); ln == 0 || ln > 2 {
 		flag.Usage()
 		os.Exit(2)
 	}
@@ -63,29 +63,53 @@ func main() {
 		r = gr
 	}
 
+	_, repStats, err := readTests(r)
+	if err != nil {
+		log.Fatal("Failed reading tests: ", err)
+	}
+
+	// If an output dir wasn't supplied, just print a summary.
+	if len(flag.Args()) < 2 {
+		for _, d := range sortedTimes(repStats) {
+			fmt.Printf("%s: %s\n", d.Format("2006-01-02"), repStats[d])
+		}
+		return
+	}
+
 	outDir := flag.Arg(1)
 	if err := os.MkdirAll(outDir, 0755); err != nil {
 		log.Fatal("Failed creating output dir: ", err)
 	}
 
-	now := time.Now()
-	colStats := make(statsMap)
-	repStats := make(statsMap)
+	if err := plotAges(filepath.Join(outDir, "positives-age.png"), repStats); err != nil {
+		log.Fatal("Failed plotting ages: ", err)
+	}
+	if err := plotDelays(filepath.Join(outDir, "delays.png"), repStats); err != nil {
+		log.Fatal("Failed plotting delays: ", err)
+	}
+}
 
+// readTests reads a JSON array of test objects from r and returns daily stats
+// aggregated by collection date and by reporting date.
+func readTests(r io.Reader) (colStats, repStats statsMap, err error) {
 	// Instead of unmarshaling all tests into slice all at once, strip off the
 	// opening bracket so we can read them one at a time. See the "Stream"
 	// example at https://golang.org/pkg/encoding/json/#Decoder.Decode.
 	dec := json.NewDecoder(r)
 	if t, err := dec.Token(); err != nil {
-		log.Fatal("Failed reading opening bracket: ", err)
+		return nil, nil, fmt.Errorf("failed reading opening bracket: ", err)
 	} else if d, ok := t.(json.Delim); !ok || d != '[' {
-		log.Fatalf("Data starts with %v instead of opening bracket", t)
+		return nil, nil, fmt.Errorf("data starts with %v instead of opening bracket", t)
 	}
+
+	now := time.Now()
+	colStats = make(statsMap)
+	repStats = make(statsMap)
 
 	for dec.More() {
 		var t test
 		if err := dec.Decode(&t); err != nil {
-			log.Fatal("Failed reading test: ", err)
+			return nil, nil, fmt.Errorf("failed reading test: ", err)
 		}
 
 		col := time.Time(t.Collected)
@@ -111,21 +135,11 @@ func main() {
 	}
 
 	if t, err := dec.Token(); err != nil {
-		log.Fatal("Failed reading closing bracket: ", err)
+		return nil, nil, fmt.Errorf("failed reading closing bracket: ", err)
 	} else if d, ok := t.(json.Delim); !ok || d != ']' {
-		log.Fatalf("Data ends with %v instead of closing bracket", t)
+		return nil, nil, fmt.Errorf("data ends with %v instead of closing bracket", t)
 	}
-
-	for _, d := range sortedTimes(repStats) {
-		fmt.Printf("%s: %s\n", d.Format("2006-01-02"), repStats[d])
-	}
-
-	if err := plotAges(filepath.Join(outDir, "positives-age.png"), repStats); err != nil {
-		log.Fatal("Failed plotting ages: ", err)
-	}
-	if err := plotDelays(filepath.Join(outDir, "delays.png"), repStats); err != nil {
-		log.Fatal("Failed plotting delays: ", err)
-	}
+	return colStats, repStats, nil
 }
 
 func plotAges(out string, m statsMap) error {
