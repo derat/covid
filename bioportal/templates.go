@@ -13,11 +13,13 @@ func templateData(dataPath, imgPath string, now time.Time) interface{} {
 		DataPath    string // path to gnuplot data file
 		SetTerm     string // 'set term' command for writing PNG image data
 		SetOutput   string // 'set output' command for writing to image file
+		LineCfg     string // 'lines' default args
 		FooterLabel string // 'set label' command for writing footer label
 	}{
 		DataPath:  dataPath,
 		SetTerm:   "set term pngcairo font 'Roboto,22' size 1280,960",
 		SetOutput: fmt.Sprintf("set output '%s'", imgPath),
+		LineCfg:   "lc rgb '#0D47A1' lw 3",
 		FooterLabel: fmt.Sprintf(
 			"set label front '{/*0.7 Generated on %s by https://github.com/derat/covid}' at screen 0.99,0.025 right",
 			time.Now().Format("2006-01-02")),
@@ -49,6 +51,24 @@ set bmargin 5
 splot '{{.DataPath}}' using 1:3:4:xtic(2) with image notitle
 `
 
+	reportsTmpl = `
+set title 'Puerto Rico Bioportal reported COVID-19 tests'
+
+{{.SetTerm}}
+{{.SetOutput}}
+
+set timefmt '%Y-%m-%d'
+set xdata time
+set xlabel 'Reporting day'
+set ylabel 'Reported results (7-day average)'
+set yrange [0:*]
+set key off
+set bmargin 5
+{{.FooterLabel}}
+
+plot '{{.DataPath}}' using 1:2 with lines {{.LineCfg}} notitle
+`
+
 	delaysTmpl = `
 set title 'Puerto Rico Bioportal COVID-19 test result delays'
 
@@ -64,7 +84,7 @@ set key top left
 set bmargin 5
 {{.FooterLabel}}
 
-plot '{{.DataPath}}' using 1:3 with lines lc rgb '#0D47A1' lw 3 title 'Median', \
+plot '{{.DataPath}}' using 1:3 with lines {{.LineCfg}} title 'Median', \
      '{{.DataPath}}' using 1:2:4 with filledcurves lc rgb '#448AFF' fs transparent solid 0.25 title '1st-3rd Quartile'
 `
 )

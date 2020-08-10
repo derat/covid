@@ -11,18 +11,6 @@ import (
 
 const maxDelay = 28 // max collect-to-report delay to track in days
 
-type statsMap map[time.Time]*stats
-
-// getStats returns the stats object for t, creating it if necessary.
-func (m statsMap) get(t time.Time) *stats {
-	if s, ok := m[t]; ok {
-		return s
-	}
-	s := newStats()
-	m[t] = s
-	return s
-}
-
 type stats struct {
 	pos, neg, other int   // number of tests by result
 	delayCounts     []int // counts of tests indexed by collect-to-report delay in days
@@ -86,7 +74,7 @@ func (s *stats) delayPct(pct float64) int {
 			return d
 		}
 	}
-	panic("didn't find delay") // shouldn't be reached
+	panic("didn't find delay at percentile") // shouldn't be reached
 }
 
 // estInf returns the estimated number of new infections using Youyang Gu's method
@@ -99,6 +87,10 @@ func (s *stats) estInf() int {
 
 // add incorporates o into s.
 func (s *stats) add(o *stats) {
+	if o == nil {
+		return
+	}
+
 	s.pos += o.pos
 	s.neg += o.neg
 	s.other += o.other
@@ -111,6 +103,19 @@ func (s *stats) add(o *stats) {
 	for ar := ageMin; ar <= ageMax; ar++ {
 		s.agePos[ar] += o.agePos[ar]
 	}
+}
+
+// statsMap holds stats indexed by time (typically days).
+type statsMap map[time.Time]*stats
+
+// getStats returns the stats object for t, creating it if necessary.
+func (m statsMap) get(t time.Time) *stats {
+	if s, ok := m[t]; ok {
+		return s
+	}
+	s := newStats()
+	m[t] = s
+	return s
 }
 
 // weeklyStats aggregates the stats in dm by week (starting on Sundays).
@@ -130,20 +135,31 @@ func weeklyStats(dm statsMap) statsMap {
 
 // averageStats returns a new map with a numDays-day rolling average for each day in dm.
 func averageStats(dm statsMap, numDays int) statsMap {
+	div := func(v int, d int) int { return int(math.Round(float64(v) / float64(d))) }
 	am := make(statsMap)
 	days := sortedTimes(dm)
 	for i, d := range days {
-		as := newStats()
-		nd := 0 // number of days
+		as := am.get(d)
+
+		nd := 0
 		for j := 0; j < numDays && i-j >= 0; j++ {
 			as.add(dm[days[i-j]])
 			nd++
 		}
-		as.pos /= nd
-		as.neg /= nd
-		as.other /= nd
-		// TODO: Update delays and age-positives.
-		am[d] = as
+
+		as.pos = div(as.pos, nd)
+		as.neg = div(as.neg, nd)
+		as.other = div(as.other, nd)
+
+		as.numDelays = 0
+		for i := 0; i < len(as.delayCounts); i++ {
+			as.delayCounts[i] = div(as.delayCounts[i], nd)
+			as.numDelays += as.delayCounts[i]
+		}
+
+		for ar := ageMin; ar <= ageMax; ar++ {
+			as.agePos[ar] = div(as.agePos[ar], nd)
+		}
 	}
 	return am
 }

@@ -81,6 +81,7 @@ func main() {
 		log.Fatal("Failed creating output dir: ", err)
 	}
 
+	avgRepStats := averageStats(repStats, 7)
 	weekRepStats := weeklyStats(repStats)
 
 	for _, plot := range []struct {
@@ -98,6 +99,16 @@ func main() {
 					for ar := age0To9; ar <= age100To109; ar++ {
 						w.Printf("%d\t%s\t%d\t%d\n", i, week.Format("01/02"), ar.min(), s.agePos[ar])
 					}
+				}
+			},
+		},
+		{
+			out:  "reports-daily.png",
+			tmpl: reportsTmpl,
+			data: func(w *filewriter.FileWriter) {
+				w.Printf("Date\tResults\n")
+				for _, d := range sortedTimes(avgRepStats) {
+					w.Printf("%s\t%d\n", d.Format("2006-01-02"), avgRepStats[d].total())
 				}
 			},
 		},
