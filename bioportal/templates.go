@@ -8,13 +8,15 @@ import (
 	"time"
 )
 
-func templateData(dataPath, imgPath string, now time.Time) interface{} {
+func templateData(dataPath, imgPath string, now time.Time, vars map[string]interface{}) interface{} {
 	return struct {
 		DataPath    string // path to gnuplot data file
 		SetTerm     string // 'set term' command for writing PNG image data
 		SetOutput   string // 'set output' command for writing to image file
 		LineCfg     string // 'lines' default args
 		FooterLabel string // 'set label' command for writing footer label
+
+		Vars map[string]interface{} // extra variables
 	}{
 		DataPath:  dataPath,
 		SetTerm:   "set term pngcairo font 'Roboto,22' size 1280,960",
@@ -23,6 +25,7 @@ func templateData(dataPath, imgPath string, now time.Time) interface{} {
 		FooterLabel: fmt.Sprintf(
 			"set label front '{/*0.7 Generated on %s by https://github.com/derat/covid}' at screen 0.99,0.025 right",
 			time.Now().Format("2006-01-02")),
+		Vars: vars,
 	}
 }
 
@@ -70,7 +73,7 @@ plot '{{.DataPath}}' using 1:2 with lines {{.LineCfg}} notitle
 `
 
 	delaysTmpl = `
-set title 'Puerto Rico Bioportal COVID-19 test result delays'
+set title 'Puerto Rico Bioportal COVID-19 {{.Vars.TestType}} test result delays'
 
 {{.SetTerm}}
 {{.SetOutput}}
@@ -79,7 +82,7 @@ set timefmt '%Y-%m-%d'
 set xdata time
 set xlabel 'Reporting week'
 set ylabel 'Result delay (days)'
-set yrange [0:*]
+set yrange [0:{{.Vars.MaxDelay}}]
 set key top left
 set bmargin 5
 {{.FooterLabel}}

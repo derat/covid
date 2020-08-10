@@ -12,15 +12,17 @@ import (
 const maxDelay = 28 // max collect-to-report delay to track in days
 
 type stats struct {
-	pos, neg, other int // number of tests by result
-	delays          *hist
-	agePos          map[ageRange]int
+	pos, neg, other              int              // number of tests by result
+	agePos                       map[ageRange]int // positive results grouped by patient age
+	delays, posDelays, negDelays *hist            // delays for total, positive, and negative results
 }
 
 func newStats() *stats {
 	return &stats{
-		delays: newHist(maxDelay),
-		agePos: make(map[ageRange]int),
+		agePos:    make(map[ageRange]int),
+		delays:    newHist(maxDelay),
+		posDelays: newHist(maxDelay),
+		negDelays: newHist(maxDelay),
 	}
 }
 
@@ -37,19 +39,15 @@ func (s *stats) update(res result, ar ageRange, delay int) {
 	switch res {
 	case positive:
 		s.pos++
-		if s.agePos == nil {
-			s.agePos = make(map[ageRange]int)
-		}
 		s.agePos[ar]++
+		s.posDelays.inc(delay)
 	case negative:
 		s.neg++
+		s.negDelays.inc(delay)
 	default:
 		s.other++
 	}
-
-	if delay >= 0 {
-		s.delays.record(delay)
-	}
+	s.delays.inc(delay)
 }
 
 func (s *stats) total() int {
@@ -58,6 +56,14 @@ func (s *stats) total() int {
 
 func (s *stats) delayPct(pct float64) int {
 	return s.delays.percentile(pct)
+}
+
+func (s *stats) posDelayPct(pct float64) int {
+	return s.posDelays.percentile(pct)
+}
+
+func (s *stats) negDelayPct(pct float64) int {
+	return s.negDelays.percentile(pct)
 }
 
 // estInf returns the estimated number of new infections using Youyang Gu's method
@@ -73,11 +79,12 @@ func (s *stats) add(o *stats) {
 	if o == nil {
 		return
 	}
-
 	s.pos += o.pos
 	s.neg += o.neg
 	s.other += o.other
 	s.delays.add(o.delays)
+	s.posDelays.add(o.posDelays)
+	s.negDelays.add(o.negDelays)
 	for ar := ageMin; ar <= ageMax; ar++ {
 		s.agePos[ar] += o.agePos[ar]
 	}
@@ -90,6 +97,8 @@ func (s *stats) scale(sc float64) {
 	s.neg = rs(s.neg)
 	s.other = rs(s.other)
 	s.delays.scale(sc)
+	s.posDelays.scale(sc)
+	s.negDelays.scale(sc)
 	for ar := ageMin; ar <= ageMax; ar++ {
 		s.agePos[ar] = rs(s.agePos[ar])
 	}
@@ -104,7 +113,12 @@ func newHist(max int) *hist {
 	return &hist{counts: make([]int, max+2)} // extra for 0 and for overflow
 }
 
-func (h *hist) record(v int) {
+// inc increments the histogram for the supplied value. Negative values are ignored.
+func (h *hist) inc(v int) {
+	if v < 0 {
+		return
+	}
+
 	i := v
 	if i >= len(h.counts) {
 		i = len(h.counts) - 1

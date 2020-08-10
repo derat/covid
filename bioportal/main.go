@@ -84,10 +84,25 @@ func main() {
 	avgRepStats := averageStats(repStats, 7)
 	weekRepStats := weeklyStats(repStats)
 
+	// Find the max 75th-percentile delay so we can use the same scale on delay plots.
+	delay75 := 0
+	for _, s := range weekRepStats {
+		if v := s.delayPct(75); v > delay75 {
+			delay75 = v
+		}
+		if v := s.posDelayPct(75); v > delay75 {
+			delay75 = v
+		}
+		if v := s.negDelayPct(75); v > delay75 {
+			delay75 = v
+		}
+	}
+
 	for _, plot := range []struct {
 		out  string                         // output file, e.g. "my-plot.png"
 		tmpl string                         // gnuplot template data
 		data func(w *filewriter.FileWriter) // writes gnuplot data to w
+		vars map[string]interface{}         // extra variables to pass to template
 	}{
 		{
 			out:  "positives-age.png",
@@ -123,6 +138,33 @@ func main() {
 						s.delayPct(25), s.delayPct(50), s.delayPct(75))
 				}
 			},
+			vars: map[string]interface{}{"TestType": "total", "MaxDelay": delay75},
+		},
+		{
+			out:  "positive-result-delays.png",
+			tmpl: delaysTmpl,
+			data: func(w *filewriter.FileWriter) {
+				w.Printf("Date\t25th\t50th\t75th\n")
+				for _, week := range sortedTimes(weekRepStats) {
+					s := weekRepStats[week]
+					w.Printf("%s\t%d\t%d\t%d\n", week.Format("2006-01-02"),
+						s.posDelayPct(25), s.posDelayPct(50), s.posDelayPct(75))
+				}
+			},
+			vars: map[string]interface{}{"TestType": "positive", "MaxDelay": delay75},
+		},
+		{
+			out:  "negative-result-delays.png",
+			tmpl: delaysTmpl,
+			data: func(w *filewriter.FileWriter) {
+				w.Printf("Date\t25th\t50th\t75th\n")
+				for _, week := range sortedTimes(weekRepStats) {
+					s := weekRepStats[week]
+					w.Printf("%s\t%d\t%d\t%d\n", week.Format("2006-01-02"),
+						s.negDelayPct(25), s.negDelayPct(50), s.negDelayPct(75))
+				}
+			},
+			vars: map[string]interface{}{"TestType": "negative", "MaxDelay": delay75},
 		},
 	} {
 		dp := filepath.Join("/tmp", "bioportal."+plot.out+".dat")
@@ -131,7 +173,8 @@ func main() {
 		if err := dw.Close(); err != nil {
 			log.Fatalf("Failed writing data for %v: %v", plot.out, err)
 		}
-		if err := gnuplot.ExecTemplate(plot.tmpl, templateData(dp, filepath.Join(outDir, plot.out), time.Now())); err != nil {
+		td := templateData(dp, filepath.Join(outDir, plot.out), time.Now(), plot.vars)
+		if err := gnuplot.ExecTemplate(plot.tmpl, td); err != nil {
 			log.Fatalf("Failed plotting %v: %v", plot.out, err)
 		}
 		os.Remove(dp)
