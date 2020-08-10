@@ -12,16 +12,15 @@ import (
 const maxDelay = 28 // max collect-to-report delay to track in days
 
 type stats struct {
-	pos, neg, other int   // number of tests by result
-	delayCounts     []int // counts of tests indexed by collect-to-report delay in days
-	numDelays       int   // total number of tests in delayCounts
+	pos, neg, other int // number of tests by result
+	delays          *hist
 	agePos          map[ageRange]int
 }
 
 func newStats() *stats {
 	return &stats{
-		delayCounts: make([]int, maxDelay+2), // extra for 0 and for overflow
-		agePos:      make(map[ageRange]int),
+		delays: newHist(maxDelay),
+		agePos: make(map[ageRange]int),
 	}
 }
 
@@ -49,12 +48,7 @@ func (s *stats) update(res result, ar ageRange, delay int) {
 	}
 
 	if delay >= 0 {
-		idx := delay
-		if idx >= len(s.delayCounts) {
-			idx = len(s.delayCounts) - 1
-		}
-		s.delayCounts[idx]++
-		s.numDelays++
+		s.delays.record(delay)
 	}
 }
 
@@ -63,18 +57,7 @@ func (s *stats) total() int {
 }
 
 func (s *stats) delayPct(pct float64) int {
-	if s.numDelays == 0 || pct < 0 || pct > 100 {
-		return 0
-	}
-
-	total := 0
-	target := 1 + int(math.Round(pct*float64(s.numDelays-1)/100))
-	for d := 0; d < len(s.delayCounts); d++ {
-		if total += s.delayCounts[d]; total >= target {
-			return d
-		}
-	}
-	panic("didn't find delay at percentile") // shouldn't be reached
+	return s.delays.percentile(pct)
 }
 
 // estInf returns the estimated number of new infections using Youyang Gu's method
@@ -94,14 +77,70 @@ func (s *stats) add(o *stats) {
 	s.pos += o.pos
 	s.neg += o.neg
 	s.other += o.other
-
-	for i := 0; i < len(s.delayCounts); i++ {
-		s.delayCounts[i] += o.delayCounts[i]
-	}
-	s.numDelays += o.numDelays
-
+	s.delays.add(o.delays)
 	for ar := ageMin; ar <= ageMax; ar++ {
 		s.agePos[ar] += o.agePos[ar]
+	}
+}
+
+// scale multiplies s's values by sc.
+func (s *stats) scale(sc float64) {
+	rs := func(v int) int { return int(math.Round(sc * float64(v))) }
+	s.pos = rs(s.pos)
+	s.neg = rs(s.neg)
+	s.other = rs(s.other)
+	s.delays.scale(sc)
+	for ar := ageMin; ar <= ageMax; ar++ {
+		s.agePos[ar] = rs(s.agePos[ar])
+	}
+}
+
+type hist struct {
+	counts []int // bucketed counts
+	total  int   // total number of tests in counts
+}
+
+func newHist(max int) *hist {
+	return &hist{counts: make([]int, max+2)} // extra for 0 and for overflow
+}
+
+func (h *hist) record(v int) {
+	i := v
+	if i >= len(h.counts) {
+		i = len(h.counts) - 1
+	}
+	h.counts[i]++
+	h.total++
+}
+
+func (h *hist) percentile(p float64) int {
+	if h.total == 0 || p < 0 || p > 100 {
+		return 0
+	}
+
+	seen := 0
+	target := 1 + int(math.Round(p*float64(h.total-1)/100))
+	for i := 0; i < len(h.counts); i++ {
+		if seen += h.counts[i]; seen >= target {
+			return i
+		}
+	}
+	panic("didn't find value for percentile") // shouldn't be reached
+}
+
+func (h *hist) add(o *hist) {
+	for i := 0; i < len(h.counts); i++ {
+		h.counts[i] += o.counts[i]
+	}
+	h.total += o.total
+}
+
+// scale scales h's counts by sc.
+func (h *hist) scale(sc float64) {
+	h.total = 0
+	for i := range h.counts {
+		h.counts[i] = int(math.Round(sc * float64(h.counts[i])))
+		h.total += h.counts[i]
 	}
 }
 
@@ -135,31 +174,16 @@ func weeklyStats(dm statsMap) statsMap {
 
 // averageStats returns a new map with a numDays-day rolling average for each day in dm.
 func averageStats(dm statsMap, numDays int) statsMap {
-	div := func(v int, d int) int { return int(math.Round(float64(v) / float64(d))) }
 	am := make(statsMap)
 	days := sortedTimes(dm)
 	for i, d := range days {
 		as := am.get(d)
-
 		nd := 0
 		for j := 0; j < numDays && i-j >= 0; j++ {
 			as.add(dm[days[i-j]])
 			nd++
 		}
-
-		as.pos = div(as.pos, nd)
-		as.neg = div(as.neg, nd)
-		as.other = div(as.other, nd)
-
-		as.numDelays = 0
-		for i := 0; i < len(as.delayCounts); i++ {
-			as.delayCounts[i] = div(as.delayCounts[i], nd)
-			as.numDelays += as.delayCounts[i]
-		}
-
-		for ar := ageMin; ar <= ageMax; ar++ {
-			as.agePos[ar] = div(as.agePos[ar], nd)
-		}
+		as.scale(1 / float64(nd))
 	}
 	return am
 }
