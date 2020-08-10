@@ -81,6 +81,8 @@ func main() {
 		log.Fatal("Failed creating output dir: ", err)
 	}
 
+	weekRepStats := weeklyStats(repStats)
+
 	for _, plot := range []struct {
 		out  string                         // output file, e.g. "my-plot.png"
 		tmpl string                         // gnuplot template data
@@ -90,24 +92,11 @@ func main() {
 			out:  "positives-age.png",
 			tmpl: posAgeTmpl,
 			data: func(w *filewriter.FileWriter) {
-				// Aggregate positives by week.
-				m := make(map[time.Time]map[ageRange]int)
-				for d, s := range repStats {
-					week := d.AddDate(0, 0, -1*int(d.Weekday())) // subtract to sunday
-					am := m[week]
-					if am == nil {
-						am = make(map[ageRange]int)
-					}
-					for ar := age0To9; ar <= age100To109; ar++ {
-						am[ar] += s.agePos[ar]
-					}
-					m[week] = am
-				}
 				w.Printf("X\tDate\tAge\tPositive Tests\n")
-				for i, week := range sortedTimes(m) {
-					am := m[week]
+				for i, week := range sortedTimes(weekRepStats) {
+					s := weekRepStats[week]
 					for ar := age0To9; ar <= age100To109; ar++ {
-						w.Printf("%d\t%s\t%d\t%d\n", i, week.Format("01/02"), ar.min(), am[ar])
+						w.Printf("%d\t%s\t%d\t%d\n", i, week.Format("01/02"), ar.min(), s.agePos[ar])
 					}
 				}
 			},
@@ -116,17 +105,9 @@ func main() {
 			out:  "result-delays.png",
 			tmpl: delaysTmpl,
 			data: func(w *filewriter.FileWriter) {
-				m := make(statsMap)
-				for d, s := range repStats {
-					week := d.AddDate(0, 0, -1*int(d.Weekday())) // subtract to sunday
-					ws := m[week]
-					ws.delays = append(ws.delays, s.delays...)
-					m[week] = ws
-				}
 				w.Printf("Date\t25th\t50th\t75th\n")
-				for _, week := range sortedTimes(m) {
-					s := m[week]
-					sort.Ints(s.delays)
+				for _, week := range sortedTimes(weekRepStats) {
+					s := weekRepStats[week]
 					w.Printf("%s\t%d\t%d\t%d\n", week.Format("2006-01-02"),
 						s.delayPct(25), s.delayPct(50), s.delayPct(75))
 				}
@@ -180,14 +161,10 @@ func readTests(r io.Reader) (colStats, repStats statsMap, err error) {
 		}
 
 		if colValid {
-			s := colStats[col]
-			s.update(t.Result, t.AgeRange, delay)
-			colStats[col] = s
+			colStats.get(col).update(t.Result, t.AgeRange, delay)
 		}
 		if repValid {
-			s := repStats[rep]
-			s.update(t.Result, t.AgeRange, delay)
-			repStats[rep] = s
+			repStats.get(rep).update(t.Result, t.AgeRange, delay)
 		}
 	}
 

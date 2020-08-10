@@ -78,6 +78,9 @@ const (
 	age120To129
 	age130To139
 	age140To149 // Huh?
+
+	ageMin = ageNA
+	ageMax = age140To149
 )
 
 var ageRangeStrings = map[string]ageRange{
