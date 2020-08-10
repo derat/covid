@@ -84,17 +84,29 @@ func main() {
 	avgRepStats := averageStats(repStats, 7)
 	weekRepStats := weeklyStats(repStats)
 
-	// Find the max 75th-percentile delay so we can use the same scale on delay plots.
-	delay75 := 0
+	// Find the max 90th-percentile delay so we can use the same scale on delay plots.
+	maxDelay := 0
 	for _, s := range weekRepStats {
-		if v := s.delayPct(75); v > delay75 {
-			delay75 = v
+		if v := s.delayPct(90); v > maxDelay {
+			maxDelay = v
 		}
-		if v := s.posDelayPct(75); v > delay75 {
-			delay75 = v
+		if v := s.posDelayPct(90); v > maxDelay {
+			maxDelay = v
 		}
-		if v := s.negDelayPct(75); v > delay75 {
-			delay75 = v
+		if v := s.negDelayPct(90); v > maxDelay {
+			maxDelay = v
+		}
+	}
+
+	// Returns a plot function that writes delay distribution data supplied by f.
+	makeDelayDataFunc := func(f func(s *stats, pct float64) int) func(w *filewriter.FileWriter) {
+		return func(w *filewriter.FileWriter) {
+			w.Printf("Date\t10th\t25th\t50th\t75th\t90th\n")
+			for _, week := range sortedTimes(weekRepStats) {
+				s := weekRepStats[week]
+				w.Printf("%s\t%d\t%d\t%d\t%d\t%d\n", week.Format("2006-01-02"),
+					f(s, 10), f(s, 25), f(s, 50), f(s, 75), f(s, 90))
+			}
 		}
 	}
 
@@ -130,41 +142,20 @@ func main() {
 		{
 			out:  "result-delays.png",
 			tmpl: delaysTmpl,
-			data: func(w *filewriter.FileWriter) {
-				w.Printf("Date\t25th\t50th\t75th\n")
-				for _, week := range sortedTimes(weekRepStats) {
-					s := weekRepStats[week]
-					w.Printf("%s\t%d\t%d\t%d\n", week.Format("2006-01-02"),
-						s.delayPct(25), s.delayPct(50), s.delayPct(75))
-				}
-			},
-			vars: map[string]interface{}{"TestType": "total", "MaxDelay": delay75},
+			data: makeDelayDataFunc(func(s *stats, pct float64) int { return s.delayPct(pct) }),
+			vars: map[string]interface{}{"TestType": "total", "MaxDelay": maxDelay},
 		},
 		{
 			out:  "positive-result-delays.png",
 			tmpl: delaysTmpl,
-			data: func(w *filewriter.FileWriter) {
-				w.Printf("Date\t25th\t50th\t75th\n")
-				for _, week := range sortedTimes(weekRepStats) {
-					s := weekRepStats[week]
-					w.Printf("%s\t%d\t%d\t%d\n", week.Format("2006-01-02"),
-						s.posDelayPct(25), s.posDelayPct(50), s.posDelayPct(75))
-				}
-			},
-			vars: map[string]interface{}{"TestType": "positive", "MaxDelay": delay75},
+			data: makeDelayDataFunc(func(s *stats, pct float64) int { return s.posDelayPct(pct) }),
+			vars: map[string]interface{}{"TestType": "positive", "MaxDelay": maxDelay},
 		},
 		{
 			out:  "negative-result-delays.png",
 			tmpl: delaysTmpl,
-			data: func(w *filewriter.FileWriter) {
-				w.Printf("Date\t25th\t50th\t75th\n")
-				for _, week := range sortedTimes(weekRepStats) {
-					s := weekRepStats[week]
-					w.Printf("%s\t%d\t%d\t%d\n", week.Format("2006-01-02"),
-						s.negDelayPct(25), s.negDelayPct(50), s.negDelayPct(75))
-				}
-			},
-			vars: map[string]interface{}{"TestType": "negative", "MaxDelay": delay75},
+			data: makeDelayDataFunc(func(s *stats, pct float64) int { return s.negDelayPct(pct) }),
+			vars: map[string]interface{}{"TestType": "negative", "MaxDelay": maxDelay},
 		},
 	} {
 		dp := filepath.Join("/tmp", "bioportal."+plot.out+".dat")

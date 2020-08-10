@@ -87,7 +87,8 @@ set key top left
 set bmargin 5
 {{.FooterLabel}}
 
-plot '{{.DataPath}}' using 1:3 with lines {{.LineCfg}} title 'Median', \
-     '{{.DataPath}}' using 1:2:4 with filledcurves lc rgb '#448AFF' fs transparent solid 0.25 title '1st-3rd Quartile'
+plot '{{.DataPath}}' using 1:2:6 with filledcurves lc rgb '#DDDDDD' title '10th-90th', \
+	 '{{.DataPath}}' using 1:3:5 with filledcurves lc rgb '#BBBBBB' title '25th-75th', \
+     '{{.DataPath}}' using 1:4 with lines lc black lw 3 title 'Median'
 `
 )
