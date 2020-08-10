@@ -21,6 +21,10 @@ import (
 	"github.com/derat/covid/gnuplot"
 )
 
+// Positive results are reported more quickly than negative results.
+// Positivity is not plotted for days close to the current date.
+const positivityDelay = 14 * 24 * time.Hour
+
 var (
 	loc       *time.Location // PR time zone
 	startDate time.Time      // earliest date to accept
@@ -63,7 +67,7 @@ func main() {
 		r = gr
 	}
 
-	_, repStats, err := readTests(r)
+	colStats, repStats, err := readTests(r)
 	if err != nil {
 		log.Fatal("Failed reading tests: ", err)
 	}
@@ -81,6 +85,7 @@ func main() {
 		log.Fatal("Failed creating output dir: ", err)
 	}
 
+	avgColStats := averageStats(colStats, 7)
 	avgRepStats := averageStats(repStats, 7)
 	weekRepStats := weeklyStats(repStats)
 
@@ -109,6 +114,8 @@ func main() {
 			}
 		}
 	}
+
+	now := time.Now()
 
 	for _, plot := range []struct {
 		out  string                         // output file, e.g. "my-plot.png"
@@ -140,6 +147,21 @@ func main() {
 			},
 		},
 		{
+			out:  "positivity.png",
+			tmpl: posRateTmpl,
+			data: func(w *filewriter.FileWriter) {
+				w.Printf("Date\tPositivity\n")
+				for _, d := range sortedTimes(avgColStats) {
+					if now.Sub(d) < positivityDelay {
+						break
+					}
+					s := avgColStats[d]
+					posPct := 100 * float64(s.pos) / float64(s.pos+s.neg)
+					w.Printf("%s\t%0.1f\n", d.Format("2006-01-02"), posPct)
+				}
+			},
+		},
+		{
 			out:  "result-delays.png",
 			tmpl: delaysTmpl,
 			data: makeDelayDataFunc(func(s *stats, pct float64) int { return s.delayPct(pct) }),
@@ -164,7 +186,7 @@ func main() {
 		if err := dw.Close(); err != nil {
 			log.Fatalf("Failed writing data for %v: %v", plot.out, err)
 		}
-		td := templateData(dp, filepath.Join(outDir, plot.out), time.Now(), plot.vars)
+		td := templateData(dp, filepath.Join(outDir, plot.out), now, plot.vars)
 		if err := gnuplot.ExecTemplate(plot.tmpl, td); err != nil {
 			log.Fatalf("Failed plotting %v: %v", plot.out, err)
 		}

@@ -62,8 +62,26 @@ set title 'Puerto Rico Bioportal reported COVID-19 tests'
 
 set timefmt '%Y-%m-%d'
 set xdata time
-set xlabel 'Reporting day'
+set xlabel 'Reporting date'
 set ylabel 'Reported results (7-day average)'
+set yrange [0:*]
+set key off
+set bmargin 5
+{{.FooterLabel}}
+
+plot '{{.DataPath}}' using 1:2 with lines {{.LineCfg}} notitle
+`
+
+	posRateTmpl = `
+set title 'Puerto Rico Bioportal COVID-19 test positivity rate'
+
+{{.SetTerm}}
+{{.SetOutput}}
+
+set timefmt '%Y-%m-%d'
+set xdata time
+set xlabel 'Sample collection date'
+set ylabel 'Percent positive (7-day average)'
 set yrange [0:*]
 set key off
 set bmargin 5
