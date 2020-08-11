@@ -180,6 +180,10 @@ func (r *result) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &s); err != nil {
 		return err
 	}
+	if s == "" {
+		*r = other
+		return nil
+	}
 	var ok bool
 	if *r, ok = resultStrings[s]; !ok {
 		return fmt.Errorf("invalid result %q", s)
