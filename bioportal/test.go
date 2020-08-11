@@ -41,12 +41,20 @@ func (j *jsonDate) UnmarshalJSON(b []byte) error {
 	return err
 }
 
+func (j *jsonDate) Equal(o *jsonDate) bool {
+	return time.Time(*j).Equal(time.Time(*o))
+}
+
 type jsonTime time.Time
 
 func (j *jsonTime) UnmarshalJSON(b []byte) error {
 	t, err := unmarshalTime(b, "01/02/2006 15:04", false)
 	*j = jsonTime(t)
 	return err
+}
+
+func (j *jsonTime) Equal(o *jsonTime) bool {
+	return time.Time(*j).Equal(time.Time(*o))
 }
 
 func unmarshalTime(b []byte, layout string, allowEmpty bool) (time.Time, error) {
@@ -85,6 +93,7 @@ const (
 )
 
 var ageRangeStrings = map[string]ageRange{
+	"":           ageNA,
 	"N/A":        ageNA,
 	"0 to 9":     age0To9,
 	"10 to 19":   age10To19,
@@ -108,10 +117,6 @@ func (a *ageRange) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &s); err != nil {
 		return err
 	}
-	if s == "" {
-		*a = ageNA
-		return nil
-	}
 	var ok bool
 	if *a, ok = ageRangeStrings[s]; !ok {
 		return fmt.Errorf("invalid age range %q", s)
@@ -129,7 +134,7 @@ func (a *ageRange) min() int {
 type testType int
 
 const (
-	antigens testType = iota
+	antigen testType = iota
 	molecular
 	serological
 	unknownType
@@ -140,17 +145,15 @@ func (t *testType) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &s); err != nil {
 		return err
 	}
-	if s == "" {
-		*t = unknownType
-		return nil
-	}
 	switch s {
-	case "Antigens":
-		*t = antigens
+	case "Antigens": // trailing 's' appears in JSON
+		*t = antigen
 	case "Molecular":
 		*t = molecular
 	case "Serological":
 		*t = serological
+	case "":
+		*t = unknownType
 	default:
 		return fmt.Errorf("invalid test type %q", s)
 	}
@@ -162,7 +165,7 @@ type result int
 const (
 	positive result = iota
 	negative
-	other
+	otherResult
 )
 
 // The strings used for the "result" property are all over the board.
@@ -183,8 +186,13 @@ const (
 //  "Positive IgM and IgG"      4
 //  "Positive IgM Only"         4
 var resultStrings = map[string]result{
+	// The IgG/IgM results imply serological testing but are sometimes used for tests that
+	// are labeled molecular. For now, just trust that these were truly molecular tests.
 	"Positive":             positive,
 	"Positive 2019-nCoV":   positive,
+	"Positive IgM and IgG": positive, // serological?
+	"Positive IgM Only":    positive, // serological?
+	"Positive IgG Only":    positive, // serological?
 	"Presumptive Positive": positive,
 	"COVID-19 Positive":    positive,
 
@@ -192,24 +200,18 @@ var resultStrings = map[string]result{
 	"Not Detected":      negative,
 	"COVID-19 Negative": negative,
 
-	"Positive IgM and IgG": other, // serological?
-	"Positive IgM Only":    other, // serological?
-	"Positive IgG Only":    other, // serological?
-	"Not Tested":           other,
-	"Inconclusive":         other,
-	"Other":                other,
-	"Not Valid":            other,
-	"Invalid":              other,
+	"Not Tested":   otherResult,
+	"Inconclusive": otherResult,
+	"Other":        otherResult,
+	"Not Valid":    otherResult,
+	"Invalid":      otherResult,
+	"":             otherResult,
 }
 
 func (r *result) UnmarshalJSON(b []byte) error {
 	var s string
 	if err := json.Unmarshal(b, &s); err != nil {
 		return err
-	}
-	if s == "" {
-		*r = other
-		return nil
 	}
 	var ok bool
 	if *r, ok = resultStrings[s]; !ok {

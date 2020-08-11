@@ -202,7 +202,7 @@ func readTests(r io.Reader) (colStats, repStats statsMap, err error) {
 	// example at https://golang.org/pkg/encoding/json/#Decoder.Decode.
 	dec := json.NewDecoder(r)
 	if t, err := dec.Token(); err != nil {
-		return nil, nil, fmt.Errorf("failed reading opening bracket: ", err)
+		return nil, nil, fmt.Errorf("failed reading opening bracket: %v", err)
 	} else if d, ok := t.(json.Delim); !ok || d != '[' {
 		return nil, nil, fmt.Errorf("data starts with %v instead of opening bracket", t)
 	}
@@ -239,7 +239,7 @@ func readTests(r io.Reader) (colStats, repStats statsMap, err error) {
 	}
 
 	if t, err := dec.Token(); err != nil {
-		return nil, nil, fmt.Errorf("failed reading closing bracket: ", err)
+		return nil, nil, fmt.Errorf("failed reading closing bracket: %v", err)
 	} else if d, ok := t.(json.Delim); !ok || d != ']' {
 		return nil, nil, fmt.Errorf("data ends with %v instead of closing bracket", t)
 	}

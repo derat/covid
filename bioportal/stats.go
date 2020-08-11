@@ -143,6 +143,9 @@ func (h *hist) percentile(p float64) int {
 }
 
 func (h *hist) add(o *hist) {
+	if len(h.counts) != len(o.counts) {
+		panic(fmt.Sprintf("can't add histograms with %v and %v bucket(s)", len(h.counts), len(o.counts)))
+	}
 	for i := 0; i < len(h.counts); i++ {
 		h.counts[i] += o.counts[i]
 	}
