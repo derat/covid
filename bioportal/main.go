@@ -216,6 +216,9 @@ func readTests(r io.Reader) (colStats, repStats statsMap, err error) {
 		if err := dec.Decode(&t); err != nil {
 			return nil, nil, fmt.Errorf("failed reading test: %v", err)
 		}
+		if t.Type != molecular {
+			continue
+		}
 
 		col := time.Time(t.Collected)
 		colValid := !col.Before(startDate) && !col.After(now)

@@ -26,6 +26,7 @@ type test struct {
 	Collected   jsonDate `json:"collectedDate"`
 	Reported    jsonDate `json:"reportedDate"`
 	AgeRange    ageRange `json:"ageRange"`
+	Type        testType `json:"testType"`
 	Result      result   `json:"result"`
 	PatientID   string   `json:"patientId"`
 	PatientCity string   `json:"patientCity"`
@@ -128,8 +129,33 @@ func (a *ageRange) min() int {
 type testType int
 
 const (
-	molecular testType = iota
+	antigens testType = iota
+	molecular
+	serological
+	unknownType
 )
+
+func (t *testType) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	if s == "" {
+		*t = unknownType
+		return nil
+	}
+	switch s {
+	case "Antigens":
+		*t = antigens
+	case "Molecular":
+		*t = molecular
+	case "Serological":
+		*t = serological
+	default:
+		return fmt.Errorf("invalid test type %q", s)
+	}
+	return nil
+}
 
 type result int
 
