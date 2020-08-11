@@ -168,6 +168,7 @@ var resultStrings = map[string]result{
 
 	"Positive IgM and IgG": other, // serological?
 	"Positive IgM Only":    other, // serological?
+	"Positive IgG Only":    other, // serological?
 	"Not Tested":           other,
 	"Inconclusive":         other,
 	"Other":                other,
