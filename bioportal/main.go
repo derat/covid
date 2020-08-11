@@ -214,7 +214,7 @@ func readTests(r io.Reader) (colStats, repStats statsMap, err error) {
 	for dec.More() {
 		var t test
 		if err := dec.Decode(&t); err != nil {
-			return nil, nil, fmt.Errorf("failed reading test: ", err)
+			return nil, nil, fmt.Errorf("failed reading test: %v", err)
 		}
 
 		col := time.Time(t.Collected)

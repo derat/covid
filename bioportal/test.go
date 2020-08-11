@@ -107,6 +107,10 @@ func (a *ageRange) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &s); err != nil {
 		return err
 	}
+	if s == "" {
+		*a = ageNA
+		return nil
+	}
 	var ok bool
 	if *a, ok = ageRangeStrings[s]; !ok {
 		return fmt.Errorf("invalid age range %q", s)
