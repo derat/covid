@@ -38,7 +38,7 @@ This plot attempts to work around the different latencies for positive and
 negative test results by using the sample collection date (rather than reporting
 date) on the X-axis and excluding the last 14 days of testing.
 
-![test positivity rate](https://github.com/derat/covid-plots/raw/master/bioportal/result-delays.png)
+![test positivity rate](https://github.com/derat/covid-plots/raw/master/bioportal/positivity.png)
 
 ## Tests reported per day
 
