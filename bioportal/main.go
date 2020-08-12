@@ -147,6 +147,17 @@ func main() {
 			},
 		},
 		{
+			out:  "test-types.png",
+			tmpl: typesTmpl,
+			data: func(w *filewriter.FileWriter) {
+				w.Printf("Date\tMolecular\tSerelogical\tAntigen\tUnknown\n")
+				for _, d := range sortedTimes(avgRepStats) {
+					s := avgRepStats[d]
+					w.Printf("%s\t%d\t%d\t%d\t%d\n", d.Format("2006-01-02"), s.total(), s.ab, s.ag, s.unk)
+				}
+			},
+		},
+		{
 			out:  "positivity.png",
 			tmpl: posRateTmpl,
 			data: func(w *filewriter.FileWriter) {
@@ -216,9 +227,6 @@ func readTests(r io.Reader) (colStats, repStats statsMap, err error) {
 		if err := dec.Decode(&t); err != nil {
 			return nil, nil, fmt.Errorf("failed reading test: %v", err)
 		}
-		if t.Type != molecular {
-			continue
-		}
 
 		col := time.Time(t.Collected)
 		colValid := !col.Before(startDate) && !col.After(now)
@@ -231,10 +239,10 @@ func readTests(r io.Reader) (colStats, repStats statsMap, err error) {
 		}
 
 		if colValid {
-			colStats.get(col).update(t.Result, t.AgeRange, delay)
+			colStats.get(col).update(t.Type, t.Result, t.AgeRange, delay)
 		}
 		if repValid {
-			repStats.get(rep).update(t.Result, t.AgeRange, delay)
+			repStats.get(rep).update(t.Type, t.Result, t.AgeRange, delay)
 		}
 	}
 

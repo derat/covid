@@ -12,9 +12,12 @@ import (
 const maxDelay = 28 // max collect-to-report delay to track in days
 
 type stats struct {
-	pos, neg, other              int              // number of tests by result
-	agePos                       map[ageRange]int // positive results grouped by patient age
-	delays, posDelays, negDelays *hist            // delays for total, positive, and negative results
+	pos, neg, other int // number of molecular tests by result
+	ab, ag, unk     int // number of serological, antigen, and unknown tests
+
+	agePos map[ageRange]int // positive molecular results grouped by patient age
+
+	delays, posDelays, negDelays *hist // delays for total, positive, and negative molecular results
 }
 
 func newStats() *stats {
@@ -35,19 +38,28 @@ func (s stats) String() string {
 }
 
 // update incorporates a single test into s.
-func (s *stats) update(res result, ar ageRange, delay int) {
-	switch res {
-	case positive:
-		s.pos++
-		s.agePos[ar]++
-		s.posDelays.inc(delay)
-	case negative:
-		s.neg++
-		s.negDelays.inc(delay)
-	default:
-		s.other++
+func (s *stats) update(t testType, res result, ar ageRange, delay int) {
+	switch t {
+	case molecular:
+		switch res {
+		case positive:
+			s.pos++
+			s.agePos[ar]++
+			s.posDelays.inc(delay)
+		case negative:
+			s.neg++
+			s.negDelays.inc(delay)
+		default:
+			s.other++
+		}
+		s.delays.inc(delay)
+	case serological:
+		s.ab++
+	case antigen:
+		s.ag++
+	case unknownType:
+		s.unk++
 	}
-	s.delays.inc(delay)
 }
 
 func (s *stats) total() int {
@@ -82,6 +94,9 @@ func (s *stats) add(o *stats) {
 	s.pos += o.pos
 	s.neg += o.neg
 	s.other += o.other
+	s.ab += o.ab
+	s.ag += o.ag
+	s.unk += o.unk
 	s.delays.add(o.delays)
 	s.posDelays.add(o.posDelays)
 	s.negDelays.add(o.negDelays)
@@ -96,6 +111,9 @@ func (s *stats) scale(sc float64) {
 	s.pos = rs(s.pos)
 	s.neg = rs(s.neg)
 	s.other = rs(s.other)
+	s.ab = rs(s.ab)
+	s.ag = rs(s.ag)
+	s.unk = rs(s.unk)
 	s.delays.scale(sc)
 	s.posDelays.scale(sc)
 	s.negDelays.scale(sc)
