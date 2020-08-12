@@ -80,7 +80,7 @@ set title 'Puerto Rico Bioportal COVID-19 tests by type'
 set timefmt '%Y-%m-%d'
 set xdata time
 set xlabel 'Reporting date'
-set ylabel 'Reported results'
+set ylabel 'Reported results (7-day average)'
 set yrange [0:*]
 set grid front xtics ytics
 set key top left invert

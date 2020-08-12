@@ -42,7 +42,9 @@ date) on the X-axis and excluding the last 14 days of testing.
 
 ## Tests reported per day
 
-![tests reported per day](https://github.com/derat/covid-plots/raw/master/bioportal/reports-daily.png)
+![molecular tests reported per day](https://github.com/derat/covid-plots/raw/master/bioportal/reports-daily.png)
+
+![tests reported per day by type](https://github.com/derat/covid-plots/raw/master/bioportal/test-types.png)
 
 See also [Dr. Rafael Irrizary's dashboard], which presents data from the same
 source.

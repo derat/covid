@@ -150,7 +150,7 @@ func main() {
 			out:  "test-types.png",
 			tmpl: typesTmpl,
 			data: func(w *filewriter.FileWriter) {
-				w.Printf("Date\tMolecular\tSerelogical\tAntigen\tUnknown\n")
+				w.Printf("Date\tMolecular\tSerological\tAntigen\tUnknown\n")
 				for _, d := range sortedTimes(avgRepStats) {
 					s := avgRepStats[d]
 					w.Printf("%s\t%d\t%d\t%d\t%d\n", d.Format("2006-01-02"), s.total(), s.ab, s.ag, s.unk)
