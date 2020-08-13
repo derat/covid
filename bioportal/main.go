@@ -137,16 +137,6 @@ func main() {
 			},
 		},
 		{
-			out:  "reports-daily.png",
-			tmpl: reportsTmpl,
-			data: func(w *filewriter.FileWriter) {
-				w.Printf("Date\tResults\n")
-				for _, d := range sortedTimes(avgRepStats) {
-					w.Printf("%s\t%d\n", d.Format("2006-01-02"), avgRepStats[d].total())
-				}
-			},
-		},
-		{
 			out:  "test-types.png",
 			tmpl: typesTmpl,
 			data: func(w *filewriter.FileWriter) {

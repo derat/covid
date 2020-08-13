@@ -3,12 +3,13 @@
 COVID-19 test results produced by private laboratories can be downloaded from
 the (undocumented?) [Bioportal API].
 
-As of 2020-08-08, this URL hangs for a few minutes before producing an 80 MB
-JSON array of objects describing results (represented by the `test` struct in
+This URL hangs for a few minutes before producing a 100+ MB JSON array of
+objects describing results (represented by the `test` struct in
 [test.go](./test.go)).
 
-As of 2020-08-10, the Bioportal API reports results from antigen, molecular, and
-serological tests. The plots below only include molecular tests.
+As of 2020-08-10, the Bioportal API reports results from antigen, molecular
+(PCR), and serological (antibody) tests. The plots below include only molecular
+tests unless indicated otherwise.
 
 [BioPortal API]: https://bioportal.salud.gov.pr/api/administration/reports/minimal-info-unique-tests
 
@@ -40,11 +41,11 @@ date) on the X-axis and excluding the last 14 days of testing.
 
 ![test positivity rate](https://github.com/derat/covid-plots/raw/master/bioportal/positivity.png)
 
-## Tests reported per day
-
-![molecular tests reported per day](https://github.com/derat/covid-plots/raw/master/bioportal/reports-daily.png)
+## Testing volume
 
 ![tests reported per day by type](https://github.com/derat/covid-plots/raw/master/bioportal/test-types.png)
+
+---
 
 See also [Dr. Rafael Irrizary's dashboard], which presents data from the same
 source.

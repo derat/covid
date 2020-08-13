@@ -52,27 +52,8 @@ set bmargin 5
 splot '{{.DataPath}}' using 1:3:4:xtic(2) with image notitle
 `
 
-	reportsTmpl = `
-set title 'Puerto Rico Bioportal COVID-19 molecular tests'
-
-{{.SetTerm}}
-{{.SetOutput}}
-
-set timefmt '%Y-%m-%d'
-set xdata time
-set xlabel 'Reporting date'
-set ylabel 'Reported results (7-day average)'
-set yrange [0:*]
-set grid front xtics ytics
-set key off
-set bmargin 5
-{{.FooterLabel}}
-
-plot '{{.DataPath}}' using 1:2 with lines lc black lw 2 notitle
-`
-
 	typesTmpl = `
-set title 'Puerto Rico Bioportal COVID-19 tests by type'
+set title 'Puerto Rico Bioportal COVID-19 daily reported tests'
 
 {{.SetTerm}}
 {{.SetOutput}}
@@ -88,7 +69,7 @@ set bmargin 5
 {{.FooterLabel}}
 
 plot '{{.DataPath}}' using 1:5 with lines lc rgb '#ef9a9a' lw 2 title 'Unknown', \
-     '{{.DataPath}}' using 1:3 with lines lc rgb '#cccccc' lw 2 title 'Serological', \
+     '{{.DataPath}}' using 1:3 with lines lc rgb '#dddddd' lw 2 title 'Serological', \
      '{{.DataPath}}' using 1:4 with lines lc rgb '#009688' lw 2 title 'Antigen', \
      '{{.DataPath}}' using 1:2 with lines lc rgb '#3f51b5' lw 2 title 'Molecular'
 `
