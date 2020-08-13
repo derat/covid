@@ -32,6 +32,9 @@ func TestStats_Update(t *testing.T) {
 	if s.ag != 2 {
 		t.Errorf("ag = %v; want 2", s.ag)
 	}
+	if v := s.total(); v != 5 { // exclude 'other'
+		t.Errorf("total = %v; want 5", v)
+	}
 
 	if v := s.agePos[age20To29]; v != 1 {
 		t.Errorf("agePos[age20To29] = %v; want 1", v)

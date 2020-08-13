@@ -63,7 +63,7 @@ func (s *stats) update(t testType, res result, ar ageRange, delay int) {
 }
 
 func (s *stats) total() int {
-	return s.pos + s.neg + s.other
+	return s.pos + s.neg // ignore useless 'other' results
 }
 
 func (s *stats) delayPct(pct float64) int {
@@ -81,7 +81,6 @@ func (s *stats) negDelayPct(pct float64) int {
 // estInf returns the estimated number of new infections using Youyang Gu's method
 // described at https://covid19-projections.com/estimating-true-infections/.
 func (s *stats) estInf() int {
-	// TODO: Maybe exclude "other" results?
 	posRate := float64(s.pos) / float64(s.total())
 	return int(math.Round(float64(s.pos) * (16*math.Pow(posRate, 0.5) + 2.5)))
 }
