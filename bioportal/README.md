@@ -13,11 +13,18 @@ tests unless indicated otherwise.
 
 [BioPortal API]: https://bioportal.salud.gov.pr/api/administration/reports/minimal-info-unique-tests
 
-## Positive tests by age
+## Results by age
 
-This heatmap displays weekly positive test results by patient age.
+These heatmaps display data based on weekly test results grouped by patient age.
+Demographic data used to calculate per-100k numbers is from a 2017 UN dataset.
 
 ![positive tests by age](https://github.com/derat/covid-plots/raw/master/bioportal/positives-age.png)
+
+![positive tests per 100k by age](https://github.com/derat/covid-plots/raw/master/bioportal/positives-age-scaled.png)
+
+![total tests per 100k by age](https://github.com/derat/covid-plots/raw/master/bioportal/results-age-scaled.png)
+
+![positivity rate by age](https://github.com/derat/covid-plots/raw/master/bioportal/positivity-age.png)
 
 ## Result delays
 

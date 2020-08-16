@@ -42,6 +42,12 @@ func TestStats_Update(t *testing.T) {
 	if v := s.agePos[age40To49]; v != 0 {
 		t.Errorf("agePos[age40To49] = %v; want 0", v)
 	}
+	if v := s.ageNeg[age0To9]; v != 1 {
+		t.Errorf("ageNeg[age0To9] = %v; want 1", v)
+	}
+	if v := s.ageNeg[age80To89]; v != 0 {
+		t.Errorf("ageNeg[age80To89] = %v; want 0", v)
+	}
 
 	if v := s.delayPct(50); v != 3 {
 		t.Errorf("delayPct(50) = %v; want 3", v)

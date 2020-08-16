@@ -28,8 +28,8 @@ func templateData(dataPath, imgPath string, now time.Time, vars map[string]inter
 }
 
 const (
-	posAgeTmpl = `
-set title 'Puerto Rico Bioportal positive COVID-19 tests by age'
+	ageHeatTmpl = `
+set title 'Puerto Rico Bioportal {{.Vars.Units}} by age'
 
 # Plot data initially to set GPVAL_DATA_* variables:
 # http://www.phyast.pitt.edu/~zov1/gnuplot/html/statistics.html
@@ -47,6 +47,8 @@ set yrange [GPVAL_DATA_Y_MIN-5:GPVAL_DATA_Y_MAX+5]
 set ylabel 'Age'
 set ytics scale 0 offset 0,-0.75
 set bmargin 5
+set lmargin at screen 0.12
+set rmargin at screen 0.85
 {{.FooterLabel}}
 
 splot '{{.DataPath}}' using 1:3:4:xtic(2) with image notitle

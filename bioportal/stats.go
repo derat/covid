@@ -15,7 +15,7 @@ type stats struct {
 	pos, neg, other int // number of molecular tests by result
 	ab, ag, unk     int // number of serological, antigen, and unknown tests
 
-	agePos map[ageRange]int // positive molecular results grouped by patient age
+	agePos, ageNeg map[ageRange]int // molecular results grouped by patient age
 
 	delays, posDelays, negDelays *hist // delays for total, positive, and negative molecular results
 }
@@ -23,6 +23,7 @@ type stats struct {
 func newStats() *stats {
 	return &stats{
 		agePos:    make(map[ageRange]int),
+		ageNeg:    make(map[ageRange]int),
 		delays:    newHist(maxDelay),
 		posDelays: newHist(maxDelay),
 		negDelays: newHist(maxDelay),
@@ -48,6 +49,7 @@ func (s *stats) update(t testType, res result, ar ageRange, delay int) {
 			s.posDelays.inc(delay)
 		case negative:
 			s.neg++
+			s.ageNeg[ar]++
 			s.negDelays.inc(delay)
 		default:
 			s.other++
@@ -101,6 +103,7 @@ func (s *stats) add(o *stats) {
 	s.negDelays.add(o.negDelays)
 	for ar := ageMin; ar <= ageMax; ar++ {
 		s.agePos[ar] += o.agePos[ar]
+		s.ageNeg[ar] += o.ageNeg[ar]
 	}
 }
 
@@ -118,6 +121,7 @@ func (s *stats) scale(sc float64) {
 	s.negDelays.scale(sc)
 	for ar := ageMin; ar <= ageMax; ar++ {
 		s.agePos[ar] = rs(s.agePos[ar])
+		s.ageNeg[ar] = rs(s.ageNeg[ar])
 	}
 }
 

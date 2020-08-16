@@ -115,6 +115,19 @@ func main() {
 		}
 	}
 
+	// Returns a plot function that writes age-stratified heatmap data supplied by f.
+	makeAgeFunc := func(f func(s *stats, ar ageRange) interface{}, max ageRange) func(w *filewriter.FileWriter) {
+		return func(w *filewriter.FileWriter) {
+			w.Printf("X\tDate\tAge\tValue\n")
+			for i, week := range sortedTimes(weekRepStats) {
+				s := weekRepStats[week]
+				for ar := age0To9; ar <= max; ar++ {
+					w.Printf("%d\t%s\t%d\t%v\n", i, week.Format("01/02"), ar.min(), f(s, ar))
+				}
+			}
+		}
+	}
+
 	now := time.Now()
 
 	for _, plot := range []struct {
@@ -125,16 +138,46 @@ func main() {
 	}{
 		{
 			out:  "positives-age.png",
-			tmpl: posAgeTmpl,
-			data: func(w *filewriter.FileWriter) {
-				w.Printf("X\tDate\tAge\tPositive Tests\n")
-				for i, week := range sortedTimes(weekRepStats) {
-					s := weekRepStats[week]
-					for ar := age0To9; ar <= age100To109; ar++ {
-						w.Printf("%d\t%s\t%d\t%d\n", i, week.Format("01/02"), ar.min(), s.agePos[ar])
-					}
+			tmpl: ageHeatTmpl,
+			data: makeAgeFunc(func(s *stats, ar ageRange) interface{} { return s.agePos[ar] }, age100To109),
+			vars: map[string]interface{}{"Units": "positive COVID-19 tests"},
+		},
+		{
+			out:  "positives-age-scaled.png",
+			tmpl: ageHeatTmpl,
+			data: makeAgeFunc(func(s *stats, ar ageRange) interface{} {
+				pop := unAgePop[ar]
+				if pop == 0 {
+					return 0
 				}
-			},
+				return int64(math.Round(100000 * float64(s.agePos[ar]) / float64(pop)))
+			}, age80To89),
+			vars: map[string]interface{}{"Units": "positive COVID-19 tests per 100,000 people"},
+		},
+		{
+			out:  "positivity-age.png",
+			tmpl: ageHeatTmpl,
+			data: makeAgeFunc(func(s *stats, ar ageRange) interface{} {
+				neg := float64(s.ageNeg[ar])
+				if neg == 0 {
+					return 0
+				}
+				pos := float64(s.agePos[ar])
+				return pos / (pos + neg)
+			}, age100To109),
+			vars: map[string]interface{}{"Units": "COVID-19 test positivity rate"},
+		},
+		{
+			out:  "results-age-scaled.png",
+			tmpl: ageHeatTmpl,
+			data: makeAgeFunc(func(s *stats, ar ageRange) interface{} {
+				pop := unAgePop[ar]
+				if pop == 0 {
+					return 0
+				}
+				return int64(math.Round(100000 * float64(s.agePos[ar]+s.ageNeg[ar]) / float64(pop)))
+			}, age80To89),
+			vars: map[string]interface{}{"Units": "total COVID-19 tests per 100,000 people"},
 		},
 		{
 			out:  "test-types.png",
