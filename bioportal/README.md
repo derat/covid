@@ -24,8 +24,6 @@ Demographic data used to calculate per-100k numbers is from a 2017 UN dataset.
 
 ![total tests per 100k by age](https://github.com/derat/covid-plots/raw/master/bioportal/results-age-scaled.png)
 
-![positivity rate by age](https://github.com/derat/covid-plots/raw/master/bioportal/positivity-age.png)
-
 ## Result delays
 
 Per [reporting by Primera Hora], positivity rates computed from the Bioportal's
@@ -42,11 +40,13 @@ results.
 
 ## Positivity rate
 
-This plot attempts to work around the different latencies for positive and
+These plots attempt to work around the different latencies for positive and
 negative test results by using the sample collection date (rather than reporting
 date) on the X-axis and excluding the last 14 days of testing.
 
 ![test positivity rate](https://github.com/derat/covid-plots/raw/master/bioportal/positivity.png)
+
+![test positivity rate by age](https://github.com/derat/covid-plots/raw/master/bioportal/positivity-age.png)
 
 ## Testing volume
 
