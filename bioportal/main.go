@@ -21,9 +21,18 @@ import (
 	"github.com/derat/covid/gnuplot"
 )
 
-// Positive results are reported more quickly than negative results.
-// Positivity is not plotted for days close to the current date.
-const positivityDelay = 14 * 24 * time.Hour
+const (
+	// Positive results are reported more quickly than negative results.
+	// Positivity is not plotted for days close to the current date.
+	positivityDelay = 14 * 24 * time.Hour
+
+	// Maximum value for positivity rates in heatmaps. Larger values are capped.
+	positivityMaxRate = 0.2
+
+	// Minimum number of tests to plot in positivity heatmaps.
+	// Values based on fewer tests are dropped.
+	positivityMinTests = 1
+)
 
 var (
 	loc       *time.Location // PR time zone
@@ -87,6 +96,7 @@ func main() {
 
 	avgColStats := averageStats(colStats, 7)
 	avgRepStats := averageStats(repStats, 7)
+	weekColStats := weeklyStats(colStats)
 	weekRepStats := weeklyStats(repStats)
 
 	// Find the max 90th-percentile delay so we can use the same scale on delay plots.
@@ -116,12 +126,16 @@ func main() {
 	}
 
 	// Returns a plot function that writes age-stratified heatmap data supplied by f.
-	makeAgeFunc := func(f func(s *stats, ar ageRange) interface{}, max ageRange) func(w *filewriter.FileWriter) {
+	makeAgeFunc := func(m statsMap, f func(s *stats, ar ageRange) interface{},
+		maxAge ageRange, maxDate time.Time) func(w *filewriter.FileWriter) {
 		return func(w *filewriter.FileWriter) {
 			w.Printf("X\tDate\tAge\tValue\n")
-			for i, week := range sortedTimes(weekRepStats) {
-				s := weekRepStats[week]
-				for ar := age0To9; ar <= max; ar++ {
+			for i, week := range sortedTimes(m) {
+				if !maxDate.IsZero() && week.AddDate(0, 0, 7).After(maxDate) {
+					break
+				}
+				s := m[week]
+				for ar := age0To9; ar <= maxAge; ar++ {
 					w.Printf("%d\t%s\t%d\t%v\n", i, week.Format("01/02"), ar.min(), f(s, ar))
 				}
 			}
@@ -139,44 +153,45 @@ func main() {
 		{
 			out:  "positives-age.png",
 			tmpl: ageHeatTmpl,
-			data: makeAgeFunc(func(s *stats, ar ageRange) interface{} { return s.agePos[ar] }, age100To109),
+			data: makeAgeFunc(weekRepStats, func(s *stats, ar ageRange) interface{} { return s.agePos[ar] },
+				age100To109, time.Time{}),
 			vars: map[string]interface{}{"Units": "positive COVID-19 tests"},
 		},
 		{
 			out:  "positives-age-scaled.png",
 			tmpl: ageHeatTmpl,
-			data: makeAgeFunc(func(s *stats, ar ageRange) interface{} {
+			data: makeAgeFunc(weekRepStats, func(s *stats, ar ageRange) interface{} {
 				pop := unAgePop[ar]
 				if pop == 0 {
 					return 0
 				}
 				return int64(math.Round(100000 * float64(s.agePos[ar]) / float64(pop)))
-			}, age80To89),
+			}, age80To89, time.Time{}),
 			vars: map[string]interface{}{"Units": "positive COVID-19 tests per 100,000 people"},
 		},
 		{
 			out:  "positivity-age.png",
 			tmpl: ageHeatTmpl,
-			data: makeAgeFunc(func(s *stats, ar ageRange) interface{} {
-				neg := float64(s.ageNeg[ar])
-				if neg == 0 {
+			data: makeAgeFunc(weekColStats, func(s *stats, ar ageRange) interface{} {
+				pos := float64(s.agePos[ar])
+				total := pos + float64(s.ageNeg[ar])
+				if total < positivityMinTests {
 					return 0
 				}
-				pos := float64(s.agePos[ar])
-				return pos / (pos + neg)
-			}, age100To109),
-			vars: map[string]interface{}{"Units": "COVID-19 test positivity rate"},
+				return math.Min(pos/total, positivityMaxRate)
+			}, age100To109, now.Add(-positivityDelay)),
+			vars: map[string]interface{}{"Units": "COVID-19 test positivity rate", "Collect": true},
 		},
 		{
 			out:  "results-age-scaled.png",
 			tmpl: ageHeatTmpl,
-			data: makeAgeFunc(func(s *stats, ar ageRange) interface{} {
+			data: makeAgeFunc(weekRepStats, func(s *stats, ar ageRange) interface{} {
 				pop := unAgePop[ar]
 				if pop == 0 {
 					return 0
 				}
 				return int64(math.Round(100000 * float64(s.agePos[ar]+s.ageNeg[ar]) / float64(pop)))
-			}, age80To89),
+			}, age80To89, time.Time{}),
 			vars: map[string]interface{}{"Units": "total COVID-19 tests per 100,000 people"},
 		},
 		{

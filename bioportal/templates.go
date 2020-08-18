@@ -41,7 +41,7 @@ plot '{{.DataPath}}' using 1:3
 
 set view map
 set xtics scale 0 rotate by 90 right
-set xlabel 'Reporting week' offset 0,-1.5
+set xlabel '{{if .Vars.Collect}}Sample collection{{else}}Reporting{{end}} week' offset 0,-1.5
 set xrange [GPVAL_DATA_X_MIN-0.5:GPVAL_DATA_X_MAX+0.5]
 set yrange [GPVAL_DATA_Y_MIN-5:GPVAL_DATA_Y_MAX+5]
 set ylabel 'Age'
