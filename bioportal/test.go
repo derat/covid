@@ -131,6 +131,13 @@ func (a *ageRange) min() int {
 	return (int(*a) - 1) * 10
 }
 
+func (a *ageRange) max() int {
+	if *a == ageNA {
+		return -1
+	}
+	return int(*a)*10 - 1
+}
+
 type testType int
 
 const (

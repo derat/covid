@@ -115,4 +115,35 @@ plot '{{.DataPath}}' using 1:2:6 with filledcurves lc rgb '#dddddd' title '10th-
 	 '{{.DataPath}}' using 1:3:5 with filledcurves lc rgb '#bbbbbb' title '25th-75th', \
      '{{.DataPath}}' using 1:4 with lines lc black lw 2 title 'Median'
 `
+
+	ageDistTmpl = `
+set title 'Puerto Rico Bioportal COVID-19 positive test distribution by age'
+
+{{.SetTerm}}
+{{.SetOutput}}
+
+set timefmt '%Y-%m-%d'
+set xdata time
+set xlabel 'Reporting date'
+set ylabel 'Fraction of all positives (7-day average)'
+set yrange [0:*]
+set grid front xtics ytics
+set key outside autotitle columnheader
+set bmargin 5
+{{.FooterLabel}}
+
+# Based on Anna Schneider's https://github.com/aschn/gnuplot-colorbrewer/blob/master/sequential/YlOrRd.plt
+set linetype 1 lc rgb '#FFFFCC' # very light yellow-orange-red
+set linetype 2 lc rgb '#FFEDA0' #
+set linetype 3 lc rgb '#FED976' # light yellow-orange-red
+set linetype 4 lc rgb '#FEB24C' #
+set linetype 5 lc rgb '#FD8D3C' #
+set linetype 6 lc rgb '#FC4E2A' # medium yellow-orange-red
+set linetype 7 lc rgb '#E31A1C' #
+set linetype 8 lc rgb '#B10026' # dark yellow-orange-red
+set linetype 9 lc rgb '#80001c'
+set linetype 10 lc rgb '#660016'
+
+plot for [i=11:2:-1] '{{.DataPath}}' using 1:i with filledcurves x1 linestyle i-1
+`
 )

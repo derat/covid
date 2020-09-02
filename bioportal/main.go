@@ -238,6 +238,32 @@ func main() {
 			data: makeDelayDataFunc(func(s *stats, pct float64) int { return s.negDelayPct(pct) }),
 			vars: map[string]interface{}{"TestType": "negative", "MaxDelay": maxDelay},
 		},
+		{
+			out:  "age-dist.png",
+			tmpl: ageDistTmpl,
+			data: func(w *filewriter.FileWriter) {
+				ars := []ageRange{age0To9, age10To19, age20To29, age30To39, age40To49, age50To59, age60To69, age70To79, age80To89, age90To99}
+				w.Printf("Date")
+				for _, ar := range ars {
+					w.Printf("\t%d-%d", ar.min(), ar.max())
+				}
+				w.Printf("\n")
+
+				for _, d := range sortedTimes(avgColStats) {
+					s := avgColStats[d]
+					w.Printf(d.Format("2006-01-02"))
+					var total, cumul int
+					for _, ar := range ars {
+						total += s.agePos[ar]
+					}
+					for _, ar := range ars {
+						cumul += s.agePos[ar]
+						w.Printf("\t%0.2f", float64(cumul)/float64(total))
+					}
+					w.Printf("\n")
+				}
+			},
+		},
 	} {
 		dp := filepath.Join("/tmp", "bioportal."+plot.out+".dat")
 		dw := filewriter.New(dp)
