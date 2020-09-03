@@ -24,6 +24,8 @@ Demographic data used to calculate per-100k numbers is from a 2017 UN dataset.
 
 ![total tests per 100k by age](https://github.com/derat/covid-plots/raw/master/bioportal/results-age-scaled.png)
 
+![age distribution of positive tests](https://github.com/derat/covid-plots/raw/master/bioportal/age-dist.png)
+
 ## Result delays
 
 Per [reporting by Primera Hora], positivity rates computed from the Bioportal's

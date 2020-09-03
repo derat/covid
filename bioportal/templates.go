@@ -124,7 +124,8 @@ set title 'Puerto Rico Bioportal COVID-19 positive test distribution by age'
 
 set timefmt '%Y-%m-%d'
 set xdata time
-set xlabel 'Reporting date'
+set autoscale xfix
+set xlabel 'Sample collection date'
 set ylabel 'Fraction of all positives (7-day average)'
 set yrange [0:*]
 set grid front xtics ytics

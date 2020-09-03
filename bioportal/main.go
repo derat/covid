@@ -32,6 +32,9 @@ const (
 	// Minimum number of tests to plot in positivity heatmaps.
 	// Values based on fewer tests are dropped.
 	positivityMinTests = 1
+
+	// Minimum number of positive tests for start of age distribution plot.
+	ageDistMinPosTests = 10
 )
 
 var (
@@ -249,8 +252,17 @@ func main() {
 				}
 				w.Printf("\n")
 
+				started := false
 				for _, d := range sortedTimes(avgColStats) {
 					s := avgColStats[d]
+
+					if !started {
+						if s.pos < ageDistMinPosTests {
+							continue
+						}
+						started = true
+					}
+
 					w.Printf(d.Format("2006-01-02"))
 					var total, cumul int
 					for _, ar := range ars {
