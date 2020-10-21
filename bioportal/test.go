@@ -157,7 +157,7 @@ func (t *testType) UnmarshalJSON(b []byte) error {
 		*t = antigen
 	case "Molecular":
 		*t = molecular
-	case "Serological":
+	case "Serological", "Serological IgG Only":
 		*t = serological
 	case "":
 		*t = unknownType
