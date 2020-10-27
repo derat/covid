@@ -195,17 +195,20 @@ const (
 var resultStrings = map[string]result{
 	// The IgG/IgM results imply serological testing but are sometimes used for tests that
 	// are labeled molecular. For now, just trust that these were truly molecular tests.
-	"Positive":             positive,
-	"Positive 2019-nCoV":   positive,
-	"Positive IgM and IgG": positive, // serological?
-	"Positive IgM Only":    positive, // serological?
-	"Positive IgG Only":    positive, // serological?
-	"Presumptive Positive": positive,
-	"COVID-19 Positive":    positive,
+	"Positive":                        positive,
+	"Positive 2019-nCoV":              positive,
+	"Positive IgM and IgG":            positive, // serological?
+	"Positive IgM Only":               positive, // serological?
+	"Positive IgG Only":               positive, // serological?
+	"Presumptive Positive":            positive,
+	"COVID-19 Positive":               positive,
+	"SARS-CoV-2 Positive":             positive,
+	"SARS-CoV-2 Presumptive Positive": positive,
 
-	"Negative":          negative,
-	"Not Detected":      negative,
-	"COVID-19 Negative": negative,
+	"Negative":            negative,
+	"Not Detected":        negative,
+	"COVID-19 Negative":   negative,
+	"SARS-CoV-2 Negative": negative,
 
 	"Not Tested":   otherResult,
 	"Inconclusive": otherResult,
