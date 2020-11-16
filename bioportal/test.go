@@ -153,9 +153,9 @@ func (t *testType) UnmarshalJSON(b []byte) error {
 		return err
 	}
 	switch s {
-	case "Antigens": // trailing 's' appears in JSON
+	case "Antigens", "ANTIGENO":
 		*t = antigen
-	case "Molecular":
+	case "Molecular", "MOLECULAR":
 		*t = molecular
 	case "Serological", "Serological IgG Only", "Total Antibodies":
 		*t = serological
