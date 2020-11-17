@@ -31,7 +31,7 @@ func newStats() *stats {
 }
 
 func (s stats) String() string {
-	str := fmt.Sprintf("%3d %4d %2d %4.1f%%",
+	str := fmt.Sprintf("%4d %4d %2d %4.1f%%",
 		s.pos, s.neg, s.other, 100*float64(s.pos)/float64(s.total()))
 	str += fmt.Sprintf(" [%d %d %d %d %d]",
 		s.delayPct(0), s.delayPct(25), s.delayPct(50), s.delayPct(75), s.delayPct(100))
