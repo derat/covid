@@ -40,12 +40,14 @@ plot '{{.DataPath}}' using 1:3
 {{.SetOutput}}
 
 set view map
+set size ratio 0.4
+set tics font ', 20'
 set xtics scale 0 rotate by 90 right
 set xlabel '{{if .Vars.Collect}}Sample collection{{else}}Reporting{{end}} week' offset 0,-1.5
 set xrange [GPVAL_DATA_X_MIN-0.5:GPVAL_DATA_X_MAX+0.5]
 set yrange [GPVAL_DATA_Y_MIN-5:GPVAL_DATA_Y_MAX+5]
 set ylabel 'Age'
-set ytics scale 0 offset 0,-0.75
+set ytics scale 0 offset 0,-0.5
 set bmargin 5
 set lmargin at screen 0.12
 set rmargin at screen 0.85
@@ -62,6 +64,7 @@ set title 'Puerto Rico Bioportal COVID-19 daily reported tests'
 
 set timefmt '%Y-%m-%d'
 set xdata time
+set format x '%m/%d'
 set xlabel 'Reporting date'
 set ylabel 'Reported results (7-day average)'
 set yrange [0:*]
@@ -84,6 +87,7 @@ set title 'Puerto Rico Bioportal COVID-19 test positivity rate'
 
 set timefmt '%Y-%m-%d'
 set xdata time
+set format x '%m/%d'
 set xlabel 'Sample collection date'
 set ylabel 'Percent positive (7-day average)'
 set yrange [0:*]
@@ -103,6 +107,7 @@ set title 'Puerto Rico Bioportal COVID-19 {{.Vars.TestType}} test result delays'
 
 set timefmt '%Y-%m-%d'
 set xdata time
+set format x '%m/%d'
 set xlabel 'Reporting week'
 set ylabel 'Result delay (days)'
 set yrange [0:{{.Vars.MaxDelay}}]
@@ -124,6 +129,7 @@ set title 'Puerto Rico Bioportal COVID-19 positive test distribution by age'
 
 set timefmt '%Y-%m-%d'
 set xdata time
+set format x '%m/%d'
 set autoscale xfix
 set xlabel 'Sample collection date'
 set ylabel 'Fraction of all positives (7-day average)'
